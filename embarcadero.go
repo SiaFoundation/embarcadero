@@ -74,7 +74,7 @@ func (c *Client) Trades() (ts []Trade, err error) {
 	return
 }
 
-// Trades returns all bids known to the embarcadero server.
+// Bids returns all bids known to the embarcadero server.
 func (c *Client) Bids() (bs []Bid, err error) {
 	err = c.get("/bids", &bs)
 	return

@@ -560,13 +560,15 @@ func fillBid(bidStr string, skynet, b64 bool) {
 		bid, err = downloadFromSkynet(bidStr)
 
 	case b64:
-		data, err := base64.StdEncoding.DecodeString(bidStr)
+		var data []byte
+		data, err = base64.StdEncoding.DecodeString(bidStr)
 		if err == nil {
 			err = encoding.Unmarshal(data, &bid)
 		}
 
 	default:
-		bids, err := embd.Bids()
+		var bids []embarcadero.Bid
+		bids, err = embd.Bids()
 		if err == nil {
 			var matches int
 			for _, b := range bids {

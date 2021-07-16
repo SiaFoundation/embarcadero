@@ -19,11 +19,11 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.com/NebulousLabs/encoding"
 	"gitlab.com/NebulousLabs/Sia/modules"
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
 	"gitlab.com/NebulousLabs/Sia/persist"
 	"gitlab.com/NebulousLabs/Sia/types"
+	"gitlab.com/NebulousLabs/encoding"
 
 	"gitlab.com/NebulousLabs/embarcadero"
 )
@@ -57,7 +57,7 @@ func probablyFillTxn(txn types.Transaction) bool {
 	return false
 }
 
-func extractBidTxn(txn types.Transaction) (types.Transaction, error) {
+func extractBidTxn(height types.BlockHeight, txn types.Transaction) (types.Transaction, error) {
 	// All we care about is that the transaction has a valid partial signature
 	// that covers either one siacoin input and one siafund output, or one
 	// siafund input and one siacoin output. (The transaction *shouldn't*
@@ -91,7 +91,7 @@ func extractBidTxn(txn types.Transaction) (types.Transaction, error) {
 		keep.TransactionSignatures = []types.TransactionSignature{sig}
 		break
 	}
-	return keep, keep.StandaloneValid(types.ASICHardforkHeight + 1)
+	return keep, keep.StandaloneValid(height)
 }
 
 func findBids(height types.BlockHeight, txns []types.Transaction) (newBids []embarcadero.Bid, filledBids []types.Transaction) {
@@ -105,10 +105,10 @@ func findBids(height types.BlockHeight, txns []types.Transaction) (newBids []emb
 			}
 			var bid embarcadero.Bid
 			if err := encoding.Unmarshal(bytes.TrimPrefix(arb, embarcadero.BidPrefix), &bid); err != nil {
-				log.Println("invalid bid:", err)
+				log.Println("failed to decode bid:", err)
 				continue
-			} else if bid.Transaction, err = extractBidTxn(bid.Transaction); err != nil {
-				log.Println("invalid bid:", err)
+			} else if bid.Transaction, err = extractBidTxn(height, bid.Transaction); err != nil {
+				log.Println("invalid bid txn:", err)
 				continue
 			}
 			if len(bid.Transaction.SiacoinInputs) == 1 {
@@ -255,7 +255,7 @@ func (mt *marketTracker) Bids() []embarcadero.Bid {
 		}
 	}
 	sort.Slice(bids, func(i, j int) bool {
-		return bids[i].Height > bids[i].Height
+		return bids[i].Height > bids[j].Height
 	})
 	return bids
 }
@@ -271,7 +271,7 @@ func (mt *marketTracker) Trades() []embarcadero.Trade {
 		}
 	}
 	sort.Slice(trades, func(i, j int) bool {
-		return trades[i].Height > trades[i].Height
+		return trades[i].Height > trades[j].Height
 	})
 	return trades
 }
