@@ -1,24 +1,19 @@
 package main
 
 import (
-	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"math/big"
-	"os"
 	"strings"
-	"text/tabwriter"
 
-	"github.com/NebulousLabs/go-skynet"
 	"gitlab.com/NebulousLabs/Sia/crypto"
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
 	"gitlab.com/NebulousLabs/Sia/types"
 	"gitlab.com/NebulousLabs/encoding"
 	"lukechampine.com/flagg"
-
-	"gitlab.com/NebulousLabs/embarcadero"
 )
 
 var (
@@ -42,27 +37,26 @@ embc trades
 Lists completed trades.
 `
 	placeUsage = `Usage:
-embc place [flags] offer ask
+embc place offer ask
 
 Places a bid, offering SC or SF for the opposite. For example:
 
 	embc place 7MS 2SF
 	
-places a bid that offers your 7 MS for the counterparty's 2 SF. By default,
-the bid is stored on the Sia blockchain, which makes the bid public and
-incurs a transaction fee. Use the --skynet or --b64 flags to create a private
-bid with no fee.
+places a bid that offers your 7 MS for the counterparty's 2 SF.  Outputs an
+base64-encoded bid containing an unsigned transaction.
 `
 	fillUsage = `Usage:
-embc fill [flags] bid
+embc fill bid
 
-Attempts to fill the provided bid, which can take a number of forms; by
-default, it expects one of the bid IDs returned by the bids command. If the
---skynet flag is set, it expects a Skynet link. If the --b64 flag is set, it
-expects a base64-encoded string.
+Attempts to fill the provided bid.  Expects a base64-encoded string.  Outputs a
+partially signed base64-encoded transaction.
+`
 
-Once filled, the completed trade transaction is signed and broadcast. This
-will incur a transaction fee.
+	completeUsage = `Usage:
+embc complete txn
+
+Signs the base64-encoded transaction and broadcasts it.
 `
 )
 
@@ -71,37 +65,23 @@ func main() {
 
 	rootCmd := flagg.Root
 	rootCmd.Usage = flagg.SimpleUsage(rootCmd, rootUsage)
-	addr := rootCmd.String("a", "http://localhost:8080", "host:port that the embarcadero API is running on")
 	siadAddr := rootCmd.String("siad", "localhost:9980", "host:port that the siad API is running on")
 
-	bidsCmd := flagg.New("bids", bidsUsage)
-	tradesCmd := flagg.New("trades", tradesUsage)
 	placeCmd := flagg.New("place", placeUsage)
 	fillCmd := flagg.New("fill", fillUsage)
-
-	var skynet, b64 bool
-	placeCmd.BoolVar(&skynet, "skynet", false, "place bid via Skynet instead of storing it on the blockchain")
-	placeCmd.BoolVar(&b64, "base64", false, "place bid via base64 strings instead of storing it on the blockchain")
-	fillCmd.BoolVar(&skynet, "skynet", false, "fill bid via Skynet instead of storing it on the blockchain")
-	fillCmd.BoolVar(&b64, "base64", false, "fill bid via base64 strings instead of storing it on the blockchain")
+	completeCmd := flagg.New("complete", completeUsage)
 
 	cmd := flagg.Parse(flagg.Tree{
 		Cmd: rootCmd,
 		Sub: []flagg.Tree{
-			{Cmd: bidsCmd},
-			{Cmd: tradesCmd},
 			{Cmd: placeCmd},
 			{Cmd: fillCmd},
+			{Cmd: completeCmd},
 		},
 	})
 	args := cmd.Args()
 
-	if skynet && b64 {
-		log.Fatal("Cannot use both skynet and base64; choose one!")
-	}
-
 	// initialize clients
-	embd = embarcadero.NewClient(*addr)
 	opts, _ := client.DefaultOptions()
 	opts.Address = *siadAddr
 	siad = client.New(opts)
@@ -114,88 +94,47 @@ func main() {
 			return
 		}
 		fmt.Println("embc v0.1.0")
-	case bidsCmd:
-		if len(args) > 0 {
-			cmd.Usage()
-			return
-		}
-		viewBids()
-	case tradesCmd:
-		if len(args) > 0 {
-			cmd.Usage()
-			return
-		}
-		viewTrades()
 	case placeCmd:
 		if len(args) != 2 {
 			cmd.Usage()
 			return
 		}
-		placeBid(args[0], args[1], skynet, b64)
+		placeBid(args[0], args[1])
 	case fillCmd:
 		if len(args) != 1 {
 			cmd.Usage()
 			return
 		}
-		fillBid(args[0], skynet, b64)
-	}
-}
-
-var (
-	embd *embarcadero.Client
-	siad *client.Client
-)
-
-func viewBids() {
-	bids, err := embd.Bids()
-	if err != nil {
-		log.Fatal(err)
-	}
-	if len(bids) == 0 {
-		fmt.Println("No bids")
-		return
-	}
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "ID\tHeight\tBid\tAsk")
-	for _, b := range bids {
-		if b.OfferingSF {
-			fmt.Fprintf(w, "%v\t%v\t%v SF\t%v\n", b.ID.String()[:8], b.Height, b.SF, formatCurrency(b.SC))
-		} else {
-			fmt.Fprintf(w, "%v\t%v\t%v\t%v SF\n", b.ID.String()[:8], b.Height, formatCurrency(b.SC), b.SF)
+		fillBid(args[0])
+	case completeCmd:
+		if len(args) != 1 {
+			cmd.Usage()
+			return
 		}
+		completeTransaction(args[0])
 	}
-	w.Flush()
 }
 
-func viewTrades() {
-	trades, err := embd.Trades()
-	if err != nil {
-		log.Fatal(err)
-	}
-	if len(trades) == 0 {
-		fmt.Println("No trades")
-		return
-	}
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "Bid Height\tFill Height\tPut\tAsk")
-	for _, t := range trades {
-		if t.Bid.OfferingSF {
-			fmt.Fprintf(w, "%v\t%v\t%v SF\t%v\n", t.Bid.Height, t.Height, t.Bid.SF, formatCurrency(t.Bid.SC))
-		} else {
-			fmt.Fprintf(w, "%v\t%v\t%v\t%v SF\n", t.Bid.Height, t.Height, formatCurrency(t.Bid.SC), t.Bid.SF)
-		}
-	}
-	w.Flush()
+var siad *client.Client
+
+// A Bid is an unfilled trade.
+type Bid struct {
+	Transaction types.Transaction
+	ID          types.OutputID
+	Height      types.BlockHeight
+	SF, SC      types.Currency
+	OfferingSF  bool
+	Invalid     bool `json:"omitempty"`
 }
 
-func createBid(inputAmount, outputAmount types.Currency, offeringSF bool) (embarcadero.Bid, error) {
+func createBid(inputAmount, outputAmount types.Currency, offeringSF bool) (Bid, error) {
 	wug, err := siad.WalletUnspentGet()
 	if err != nil {
-		return embarcadero.Bid{}, err
+		return Bid{}, err
 	}
 
 	var setupTxn types.Transaction
-	bid := embarcadero.Bid{
+	bid := Bid{
 		OfferingSF: offeringSF,
 	}
 	if bid.OfferingSF {
@@ -203,7 +142,7 @@ func createBid(inputAmount, outputAmount types.Currency, offeringSF bool) (embar
 
 		wag, err := siad.WalletAddressGet()
 		if err != nil {
-			return embarcadero.Bid{}, err
+			return Bid{}, err
 		}
 
 		// construct setup transaction
@@ -212,7 +151,7 @@ func createBid(inputAmount, outputAmount types.Currency, offeringSF bool) (embar
 			if u.FundType == types.SpecifierSiafundOutput {
 				wucg, err := siad.WalletUnlockConditionsGet(u.UnlockHash)
 				if err != nil {
-					return embarcadero.Bid{}, err
+					return Bid{}, err
 				}
 				setupTxn.SiafundInputs = append(setupTxn.SiafundInputs, types.SiafundInput{
 					ParentID:         types.SiafundOutputID(u.ID),
@@ -230,11 +169,11 @@ func createBid(inputAmount, outputAmount types.Currency, offeringSF bool) (embar
 			}
 		}
 		if inputSum.Cmp(inputAmount) < 0 {
-			return embarcadero.Bid{}, errors.New("insufficient funds")
+			return Bid{}, errors.New("insufficient funds")
 		}
 		wag2, err := siad.WalletAddressGet()
 		if err != nil {
-			return embarcadero.Bid{}, err
+			return Bid{}, err
 		}
 		setupTxn.SiafundOutputs = []types.SiafundOutput{{
 			UnlockHash: wag2.Address,
@@ -244,7 +183,7 @@ func createBid(inputAmount, outputAmount types.Currency, offeringSF bool) (embar
 			// add change output
 			wag3, err := siad.WalletAddressGet()
 			if err != nil {
-				return embarcadero.Bid{}, err
+				return Bid{}, err
 			}
 			setupTxn.SiafundOutputs = append(setupTxn.SiafundOutputs, types.SiafundOutput{
 				UnlockHash: wag3.Address,
@@ -255,11 +194,11 @@ func createBid(inputAmount, outputAmount types.Currency, offeringSF bool) (embar
 		// construct bid transaction
 		wucg, err := siad.WalletUnlockConditionsGet(wag2.Address)
 		if err != nil {
-			return embarcadero.Bid{}, err
+			return Bid{}, err
 		}
 		wag4, err := siad.WalletAddressGet()
 		if err != nil {
-			return embarcadero.Bid{}, err
+			return Bid{}, err
 		}
 		bid.Transaction = types.Transaction{
 			SiafundInputs: []types.SiafundInput{{
@@ -289,7 +228,7 @@ func createBid(inputAmount, outputAmount types.Currency, offeringSF bool) (embar
 			if u.FundType == types.SpecifierSiacoinOutput {
 				wucg, err := siad.WalletUnlockConditionsGet(u.UnlockHash)
 				if err != nil {
-					return embarcadero.Bid{}, err
+					return Bid{}, err
 				}
 				setupTxn.SiacoinInputs = append(setupTxn.SiacoinInputs, types.SiacoinInput{
 					ParentID:         types.SiacoinOutputID(u.ID),
@@ -306,11 +245,11 @@ func createBid(inputAmount, outputAmount types.Currency, offeringSF bool) (embar
 			}
 		}
 		if inputSum.Cmp(inputAmount) < 0 {
-			return embarcadero.Bid{}, errors.New("insufficient funds")
+			return Bid{}, errors.New("insufficient funds")
 		}
 		wag2, err := siad.WalletAddressGet()
 		if err != nil {
-			return embarcadero.Bid{}, err
+			return Bid{}, err
 		}
 		setupTxn.SiacoinOutputs = []types.SiacoinOutput{{
 			UnlockHash: wag2.Address,
@@ -320,7 +259,7 @@ func createBid(inputAmount, outputAmount types.Currency, offeringSF bool) (embar
 			// add change output
 			wag3, err := siad.WalletAddressGet()
 			if err != nil {
-				return embarcadero.Bid{}, err
+				return Bid{}, err
 			}
 			setupTxn.SiacoinOutputs = append(setupTxn.SiacoinOutputs, types.SiacoinOutput{
 				UnlockHash: wag3.Address,
@@ -331,11 +270,11 @@ func createBid(inputAmount, outputAmount types.Currency, offeringSF bool) (embar
 		// construct bid transaction
 		wucg, err := siad.WalletUnlockConditionsGet(wag2.Address)
 		if err != nil {
-			return embarcadero.Bid{}, err
+			return Bid{}, err
 		}
 		wag4, err := siad.WalletAddressGet()
 		if err != nil {
-			return embarcadero.Bid{}, err
+			return Bid{}, err
 		}
 		bid.Transaction = types.Transaction{
 			SiacoinInputs: []types.SiacoinInput{{
@@ -362,49 +301,19 @@ func createBid(inputAmount, outputAmount types.Currency, offeringSF bool) (embar
 	// sign
 	wspr, err := siad.WalletSignPost(setupTxn, nil)
 	if err != nil {
-		return embarcadero.Bid{}, err
+		return Bid{}, err
 	}
 	setupTxn = wspr.Transaction
 	wspr, err = siad.WalletSignPost(bid.Transaction, nil)
 	if err != nil {
-		return embarcadero.Bid{}, err
+		return Bid{}, err
 	}
 	bid.Transaction = wspr.Transaction
-
-	// broadcast setup transaction
-	if err := siad.TransactionPoolRawPost(setupTxn, nil); err != nil {
-		return embarcadero.Bid{}, err
-	}
 
 	return bid, nil
 }
 
-func uploadToSkynet(bid embarcadero.Bid) (string, error) {
-	data := skynet.UploadData{"embarcaderobid": bytes.NewReader(encoding.Marshal(bid))}
-	return skynet.Upload(data, skynet.DefaultUploadOptions)
-}
-
-func downloadFromSkynet(link string) (bid embarcadero.Bid, err error) {
-	rc, err := skynet.Download(link, skynet.DefaultDownloadOptions)
-	if err != nil {
-		return
-	}
-	defer rc.Close()
-	err = encoding.NewDecoder(rc, encoding.DefaultAllocLimit).Decode(&bid)
-	return
-}
-
-func storeOnChain(bid embarcadero.Bid) (string, error) {
-	txn := types.Transaction{
-		ArbitraryData: [][]byte{append(embarcadero.BidPrefix[:], encoding.Marshal(bid)...)},
-	}
-	if err := siad.TransactionPoolRawPost(txn, nil); err != nil {
-		return "", err
-	}
-	return bid.ID.String(), nil
-}
-
-func fillBidTxn(bid embarcadero.Bid) (types.Transaction, error) {
+func fillBidTxn(bid Bid) (types.Transaction, error) {
 	wug, err := siad.WalletUnspentGet()
 	if err != nil {
 		return types.Transaction{}, err
@@ -514,7 +423,7 @@ func fillBidTxn(bid embarcadero.Bid) (types.Transaction, error) {
 	return fillTxn, nil
 }
 
-func placeBid(inStr, outStr string, skynet, b64 bool) {
+func placeBid(inStr, outStr string) {
 	if strings.Contains(inStr, "SF") == strings.Contains(outStr, "SF") {
 		log.Fatal("Invalid bid: must specify one SC value and one SF value")
 	}
@@ -523,67 +432,20 @@ func placeBid(inStr, outStr string, skynet, b64 bool) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	switch {
-	case skynet:
-		link, err := uploadToSkynet(bid)
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Println("Bid created successfully.")
-		fmt.Println("Share this link with your desired counterparty:")
-		fmt.Println("   ", link)
-
-	case b64:
-		fmt.Println("Bid created successfully.")
-		fmt.Println("Share this string with your desired counterparty:")
-		fmt.Println(base64.StdEncoding.EncodeToString(encoding.Marshal(bid)))
-
-	default:
-		id, err := storeOnChain(bid)
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Println("Bid created successfully.")
-		fmt.Println("Your bid has been submitted for inclusion in the next block.")
-		fmt.Println("When the bid appears on-chain, it will be listed in the 'bids' command.")
-		fmt.Println("Your bid ID is:")
-		fmt.Println("   ", id)
-	}
+	fmt.Println("Bid created successfully.")
+	fmt.Println("Share this string with your desired counterparty:")
+	fmt.Println(base64.StdEncoding.EncodeToString(encoding.Marshal(bid)))
 }
 
-func fillBid(bidStr string, skynet, b64 bool) {
+func fillBid(bidStr string) {
 	// load bid from specified source
-	var bid embarcadero.Bid
-	var err error
-	switch {
-	case skynet:
-		bid, err = downloadFromSkynet(bidStr)
-
-	case b64:
-		var data []byte
-		data, err = base64.StdEncoding.DecodeString(bidStr)
-		if err == nil {
-			err = encoding.Unmarshal(data, &bid)
-		}
-
-	default:
-		var bids []embarcadero.Bid
-		bids, err = embd.Bids()
-		if err == nil {
-			var matches int
-			for _, b := range bids {
-				if strings.HasPrefix(b.ID.String(), bidStr) {
-					bid = b
-					matches++
-				}
-			}
-			if matches == 0 {
-				err = errors.New("bid not found")
-			} else if matches > 1 {
-				err = errors.New("bid ID not unique; add more digits")
-			}
-		}
+	var bid Bid
+	var data []byte
+	data, err := base64.StdEncoding.DecodeString(bidStr)
+	if err == nil {
+		err = encoding.Unmarshal(data, &bid)
 	}
+
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -609,17 +471,41 @@ func fillBid(bidStr string, skynet, b64 bool) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// sign and broadcast
+
+	// sign
 	wspr, err := siad.WalletSignPost(fillTxn, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := siad.TransactionPoolRawPost(wspr.Transaction, nil); err != nil {
+
+	encoded, err := json.Marshal(wspr)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Bid filled successfully.")
+	fmt.Println("Transaction:", base64.StdEncoding.EncodeToString(encoded))
+}
+
+func completeTransaction(txnStr string) {
+	decoded, err := base64.StdEncoding.DecodeString(txnStr)
+	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Bid filled successfully.")
-	fmt.Println("Transaction ID:", wspr.Transaction.ID())
+	var txn types.Transaction
+	if err := json.Unmarshal(decoded, &txn); err != nil {
+		log.Fatal(err)
+	}
+
+	// sign and broadcast
+	signed, err := siad.WalletSignPost(txn, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := siad.TransactionPoolRawPost(signed.Transaction, nil); err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Successfully broadcasted trade")
 }
 
 func parseCurrency(amount string) types.Currency {
