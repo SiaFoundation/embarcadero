@@ -2,17 +2,16 @@ package main
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"math/big"
 	"strings"
 
-	"gitlab.com/NebulousLabs/Sia/crypto"
-	"gitlab.com/NebulousLabs/Sia/node/api/client"
-	"gitlab.com/NebulousLabs/Sia/types"
 	"gitlab.com/NebulousLabs/encoding"
+	"go.sia.tech/siad/crypto"
+	"go.sia.tech/siad/node/api/client"
+	"go.sia.tech/siad/types"
 	"lukechampine.com/flagg"
 )
 
@@ -21,44 +20,41 @@ var (
     embc [flags] [action]
 
 Actions:
-    bids          list open bids
-    trades        list completed trades
-    place         place a bid
-    fill          fill an open bid
+    create        create a swap transaction
+    accept        accept a swap transaction
+	finish        sign + broadcast a swap transaction
 `
-	bidsUsage = `Usage:
-embc bids
+	createUsage = `Usage:
+embc create [ours] [theirs]
 
-Lists open bids.
-`
-	tradesUsage = `Usage:
-embc trades
+Creates a transaction that swaps SC for SF, or vice versa. For example:
 
-Lists completed trades.
-`
-	placeUsage = `Usage:
-embc place offer ask
-
-Places a bid, offering SC or SF for the opposite. For example:
-
-	embc place 7MS 2SF
+	embc create 7MS 2SF
 	
-places a bid that offers your 7 MS for the counterparty's 2 SF.  Outputs an
-base64-encoded bid containing an unsigned transaction.
+creates a transaction that swaps your 7 MS for the counterparty's 2 SF.
+The transaction is unsigned, and only contains inputs from your wallet.
+The counterparty must add their own inputs with 'embc accept' before the
+transaction can be signed and broadcast.
 `
-	fillUsage = `Usage:
-embc fill bid
+	acceptUsage = `Usage:
+embc accept [txn]
 
-Attempts to fill the provided bid.  Expects a base64-encoded string.  Outputs a
-partially signed base64-encoded transaction.
+Displays a proposed swap transaction. If you accept the proposal, your inputs
+will be added to complete the swap. The resulting transaction must be returned
+to the original party and countersigned with 'embc finish' before it is valid
+and ready for broadcasting.
 `
 
-	completeUsage = `Usage:
-embc complete txn
+	finishUsage = `Usage:
+embc finish [txn]
 
-Signs the base64-encoded transaction and broadcasts it.
+Displays a proposed swap transaction. If you accept the proposal, your
+signatures will be added, finalizing the transaction. The transaction is then
+broadcasted.
 `
 )
+
+var siad *client.Client
 
 func main() {
 	log.SetFlags(0)
@@ -67,21 +63,21 @@ func main() {
 	rootCmd.Usage = flagg.SimpleUsage(rootCmd, rootUsage)
 	siadAddr := rootCmd.String("siad", "localhost:9980", "host:port that the siad API is running on")
 
-	placeCmd := flagg.New("place", placeUsage)
-	fillCmd := flagg.New("fill", fillUsage)
-	completeCmd := flagg.New("complete", completeUsage)
+	createCmd := flagg.New("create", createUsage)
+	acceptCmd := flagg.New("accept", acceptUsage)
+	finishCmd := flagg.New("finish", finishUsage)
 
 	cmd := flagg.Parse(flagg.Tree{
 		Cmd: rootCmd,
 		Sub: []flagg.Tree{
-			{Cmd: placeCmd},
-			{Cmd: fillCmd},
-			{Cmd: completeCmd},
+			{Cmd: createCmd},
+			{Cmd: acceptCmd},
+			{Cmd: finishCmd},
 		},
 	})
 	args := cmd.Args()
 
-	// initialize clients
+	// initialize client
 	opts, _ := client.DefaultOptions()
 	opts.Address = *siadAddr
 	siad = client.New(opts)
@@ -94,418 +90,138 @@ func main() {
 			return
 		}
 		fmt.Println("embc v0.1.0")
-	case placeCmd:
+	case createCmd:
 		if len(args) != 2 {
 			cmd.Usage()
 			return
 		}
-		placeBid(args[0], args[1])
-	case fillCmd:
+		create(args[0], args[1])
+	case acceptCmd:
 		if len(args) != 1 {
 			cmd.Usage()
 			return
 		}
-		fillBid(args[0])
-	case completeCmd:
+		accept(args[0])
+	case finishCmd:
 		if len(args) != 1 {
 			cmd.Usage()
 			return
 		}
-		completeTransaction(args[0])
+		finish(args[0])
 	}
 }
 
-var siad *client.Client
+var minerFee = types.SiacoinPrecision.Mul64(5)
 
-// A Bid is an unfilled trade.
-type Bid struct {
-	Transaction types.Transaction
-	ID          types.OutputID
-	Height      types.BlockHeight
-	SF, SC      types.Currency
-	OfferingSF  bool
-	Invalid     bool `json:"omitempty"`
+type swapTransaction struct {
+	SiacoinInputs  []types.SiacoinInput
+	SiafundInputs  []types.SiafundInput
+	SiacoinOutputs []types.SiacoinOutput
+	SiafundOutputs []types.SiafundOutput
+	Signatures     []types.TransactionSignature
 }
 
-func createBid(inputAmount, outputAmount types.Currency, offeringSF bool) (Bid, error) {
-	wug, err := siad.WalletUnspentGet()
-	if err != nil {
-		return Bid{}, err
+func (swap *swapTransaction) Transaction() types.Transaction {
+	return types.Transaction{
+		SiacoinInputs:         swap.SiacoinInputs,
+		SiafundInputs:         swap.SiafundInputs,
+		SiacoinOutputs:        swap.SiacoinOutputs,
+		SiafundOutputs:        swap.SiafundOutputs,
+		MinerFees:             []types.Currency{minerFee},
+		TransactionSignatures: swap.Signatures,
 	}
-
-	var setupTxn types.Transaction
-	bid := Bid{
-		OfferingSF: offeringSF,
-	}
-	if bid.OfferingSF {
-		bid.SF, bid.SC = inputAmount, outputAmount
-
-		wag, err := siad.WalletAddressGet()
-		if err != nil {
-			return Bid{}, err
-		}
-
-		// construct setup transaction
-		var inputSum types.Currency
-		for _, u := range wug.Outputs {
-			if u.FundType == types.SpecifierSiafundOutput {
-				wucg, err := siad.WalletUnlockConditionsGet(u.UnlockHash)
-				if err != nil {
-					return Bid{}, err
-				}
-				setupTxn.SiafundInputs = append(setupTxn.SiafundInputs, types.SiafundInput{
-					ParentID:         types.SiafundOutputID(u.ID),
-					UnlockConditions: wucg.UnlockConditions,
-					ClaimUnlockHash:  wag.Address,
-				})
-				setupTxn.TransactionSignatures = append(setupTxn.TransactionSignatures, types.TransactionSignature{
-					ParentID:      crypto.Hash(types.SiacoinOutputID(u.ID)),
-					CoveredFields: types.FullCoveredFields,
-				})
-				inputSum = inputSum.Add(u.Value)
-				if inputSum.Cmp(inputAmount) >= 0 {
-					break
-				}
-			}
-		}
-		if inputSum.Cmp(inputAmount) < 0 {
-			return Bid{}, errors.New("insufficient funds")
-		}
-		wag2, err := siad.WalletAddressGet()
-		if err != nil {
-			return Bid{}, err
-		}
-		setupTxn.SiafundOutputs = []types.SiafundOutput{{
-			UnlockHash: wag2.Address,
-			Value:      inputAmount,
-		}}
-		if !inputSum.Equals(inputAmount) {
-			// add change output
-			wag3, err := siad.WalletAddressGet()
-			if err != nil {
-				return Bid{}, err
-			}
-			setupTxn.SiafundOutputs = append(setupTxn.SiafundOutputs, types.SiafundOutput{
-				UnlockHash: wag3.Address,
-				Value:      inputSum.Sub(inputAmount),
-			})
-		}
-
-		// construct bid transaction
-		wucg, err := siad.WalletUnlockConditionsGet(wag2.Address)
-		if err != nil {
-			return Bid{}, err
-		}
-		wag4, err := siad.WalletAddressGet()
-		if err != nil {
-			return Bid{}, err
-		}
-		bid.Transaction = types.Transaction{
-			SiafundInputs: []types.SiafundInput{{
-				ParentID:         setupTxn.SiafundOutputID(0),
-				UnlockConditions: wucg.UnlockConditions,
-			}},
-			SiacoinOutputs: []types.SiacoinOutput{{
-				UnlockHash: wag4.Address,
-				Value:      outputAmount,
-			}},
-			TransactionSignatures: []types.TransactionSignature{{
-				ParentID:       crypto.Hash(setupTxn.SiafundOutputID(0)),
-				PublicKeyIndex: 0,
-				Timelock:       0,
-				CoveredFields: types.CoveredFields{
-					SiafundInputs:  []uint64{0},
-					SiacoinOutputs: []uint64{0},
-				},
-			}},
-		}
-		bid.ID = types.OutputID(setupTxn.SiafundOutputID(0))
-	} else {
-		bid.SC, bid.SF = inputAmount, outputAmount
-		// construct setup transaction
-		var inputSum types.Currency
-		for _, u := range wug.Outputs {
-			if u.FundType == types.SpecifierSiacoinOutput {
-				wucg, err := siad.WalletUnlockConditionsGet(u.UnlockHash)
-				if err != nil {
-					return Bid{}, err
-				}
-				setupTxn.SiacoinInputs = append(setupTxn.SiacoinInputs, types.SiacoinInput{
-					ParentID:         types.SiacoinOutputID(u.ID),
-					UnlockConditions: wucg.UnlockConditions,
-				})
-				setupTxn.TransactionSignatures = append(setupTxn.TransactionSignatures, types.TransactionSignature{
-					ParentID:      crypto.Hash(types.SiacoinOutputID(u.ID)),
-					CoveredFields: types.FullCoveredFields,
-				})
-				inputSum = inputSum.Add(u.Value)
-				if inputSum.Cmp(inputAmount) >= 0 {
-					break
-				}
-			}
-		}
-		if inputSum.Cmp(inputAmount) < 0 {
-			return Bid{}, errors.New("insufficient funds")
-		}
-		wag2, err := siad.WalletAddressGet()
-		if err != nil {
-			return Bid{}, err
-		}
-		setupTxn.SiacoinOutputs = []types.SiacoinOutput{{
-			UnlockHash: wag2.Address,
-			Value:      inputAmount,
-		}}
-		if !inputSum.Equals(inputAmount) {
-			// add change output
-			wag3, err := siad.WalletAddressGet()
-			if err != nil {
-				return Bid{}, err
-			}
-			setupTxn.SiacoinOutputs = append(setupTxn.SiacoinOutputs, types.SiacoinOutput{
-				UnlockHash: wag3.Address,
-				Value:      inputSum.Sub(inputAmount),
-			})
-		}
-
-		// construct bid transaction
-		wucg, err := siad.WalletUnlockConditionsGet(wag2.Address)
-		if err != nil {
-			return Bid{}, err
-		}
-		wag4, err := siad.WalletAddressGet()
-		if err != nil {
-			return Bid{}, err
-		}
-		bid.Transaction = types.Transaction{
-			SiacoinInputs: []types.SiacoinInput{{
-				ParentID:         setupTxn.SiacoinOutputID(0),
-				UnlockConditions: wucg.UnlockConditions,
-			}},
-			SiafundOutputs: []types.SiafundOutput{{
-				UnlockHash: wag4.Address,
-				Value:      outputAmount,
-			}},
-			TransactionSignatures: []types.TransactionSignature{{
-				ParentID:       crypto.Hash(setupTxn.SiacoinOutputID(0)),
-				PublicKeyIndex: 0,
-				Timelock:       0,
-				CoveredFields: types.CoveredFields{
-					SiacoinInputs:  []uint64{0},
-					SiafundOutputs: []uint64{0},
-				},
-			}},
-		}
-		bid.ID = types.OutputID(setupTxn.SiacoinOutputID(0))
-	}
-
-	// sign
-	wspr, err := siad.WalletSignPost(setupTxn, nil)
-	if err != nil {
-		return Bid{}, err
-	}
-	setupTxn = wspr.Transaction
-	wspr, err = siad.WalletSignPost(bid.Transaction, nil)
-	if err != nil {
-		return Bid{}, err
-	}
-	bid.Transaction = wspr.Transaction
-
-	return bid, nil
 }
 
-func fillBidTxn(bid Bid) (types.Transaction, error) {
-	wug, err := siad.WalletUnspentGet()
-	if err != nil {
-		return types.Transaction{}, err
-	}
-
-	fillTxn := bid.Transaction
-	if bid.OfferingSF {
-		// fill in siacoin input(s) and siafund output
-		var inputSum types.Currency
-		for _, u := range wug.Outputs {
-			if u.FundType == types.SpecifierSiacoinOutput {
-				wucg, err := siad.WalletUnlockConditionsGet(u.UnlockHash)
-				if err != nil {
-					return types.Transaction{}, err
-				}
-				fillTxn.SiacoinInputs = append(fillTxn.SiacoinInputs, types.SiacoinInput{
-					ParentID:         types.SiacoinOutputID(u.ID),
-					UnlockConditions: wucg.UnlockConditions,
-				})
-				fillTxn.TransactionSignatures = append(fillTxn.TransactionSignatures, types.TransactionSignature{
-					ParentID:       crypto.Hash(u.ID),
-					PublicKeyIndex: 0,
-					CoveredFields:  types.FullCoveredFields,
-				})
-				inputSum = inputSum.Add(u.Value)
-				if inputSum.Cmp(bid.SC) >= 0 {
-					break
-				}
-			}
-		}
-		if inputSum.Cmp(bid.SC) < 0 {
-			return types.Transaction{}, errors.New("insufficient funds")
-		}
-
-		if !inputSum.Equals(bid.SC) {
-			// add change output
-			wag, err := siad.WalletAddressGet()
-			if err != nil {
-				return types.Transaction{}, err
-			}
-			fillTxn.SiacoinOutputs = append(fillTxn.SiacoinOutputs, types.SiacoinOutput{
-				UnlockHash: wag.Address,
-				Value:      inputSum.Sub(bid.SC),
-			})
-		}
-		wag, err := siad.WalletAddressGet()
-		if err != nil {
-			return types.Transaction{}, err
-		}
-		fillTxn.SiafundOutputs = []types.SiafundOutput{{
-			UnlockHash: wag.Address,
-			Value:      bid.SF,
-		}}
-	} else {
-		cuhwag, err := siad.WalletAddressGet()
-		if err != nil {
-			return types.Transaction{}, err
-		}
-		// fill in siafund input(s) and siacoin output
-		var inputSum types.Currency
-		for _, u := range wug.Outputs {
-			if u.FundType == types.SpecifierSiafundOutput {
-				wucg, err := siad.WalletUnlockConditionsGet(u.UnlockHash)
-				if err != nil {
-					return types.Transaction{}, err
-				}
-				fillTxn.SiafundInputs = append(fillTxn.SiafundInputs, types.SiafundInput{
-					ParentID:         types.SiafundOutputID(u.ID),
-					UnlockConditions: wucg.UnlockConditions,
-					ClaimUnlockHash:  cuhwag.Address,
-				})
-				fillTxn.TransactionSignatures = append(fillTxn.TransactionSignatures, types.TransactionSignature{
-					ParentID:       crypto.Hash(u.ID),
-					PublicKeyIndex: 0,
-					CoveredFields:  types.FullCoveredFields,
-				})
-				inputSum = inputSum.Add(u.Value)
-				if inputSum.Cmp(bid.SF) >= 0 {
-					break
-				}
-			}
-		}
-		if inputSum.Cmp(bid.SF) < 0 {
-			return types.Transaction{}, errors.New("insufficient funds")
-		}
-
-		if !inputSum.Equals(bid.SF) {
-			// add change output
-			wag, err := siad.WalletAddressGet()
-			if err != nil {
-				return types.Transaction{}, err
-			}
-			fillTxn.SiafundOutputs = append(fillTxn.SiafundOutputs, types.SiafundOutput{
-				UnlockHash: wag.Address,
-				Value:      inputSum.Sub(bid.SF),
-			})
-		}
-		wag, err := siad.WalletAddressGet()
-		if err != nil {
-			return types.Transaction{}, err
-		}
-		fillTxn.SiacoinOutputs = []types.SiacoinOutput{{
-			UnlockHash: wag.Address,
-			Value:      bid.SC,
-		}}
-	}
-	return fillTxn, nil
-}
-
-func placeBid(inStr, outStr string) {
+func create(inStr, outStr string) {
 	if strings.Contains(inStr, "SF") == strings.Contains(outStr, "SF") {
-		log.Fatal("Invalid bid: must specify one SC value and one SF value")
+		log.Fatal("Invalid swap: must specify one SC value and one SF value")
 	}
 	input, output := parseCurrency(inStr), parseCurrency(outStr)
-	bid, err := createBid(input, output, strings.Contains(inStr, "SF"))
+	swap, err := createSwap(input, output, strings.Contains(inStr, "SF"))
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("Bid created successfully.")
-	fmt.Println("Share this string with your desired counterparty:")
-	fmt.Println(base64.StdEncoding.EncodeToString(encoding.Marshal(bid)))
+	fmt.Println("To proceed, ask your counterparty to run the following command:")
+	fmt.Println()
+	fmt.Println("    embc accept", encodeSwap(swap))
 }
 
-func fillBid(bidStr string) {
-	// load bid from specified source
-	var bid Bid
-	var data []byte
-	data, err := base64.StdEncoding.DecodeString(bidStr)
-	if err == nil {
-		err = encoding.Unmarshal(data, &bid)
-	}
-
+func accept(swapStr string) {
+	swap, err := decodeSwap(swapStr)
 	if err != nil {
 		log.Fatal(err)
 	}
-	// display bid details and require confirmation
-	fmt.Println("Bid details:")
-	var theirs, yours string
-	if bid.OfferingSF {
-		theirs = fmt.Sprintf("%v SF", bid.SF)
-		yours = bid.SC.HumanString()
-	} else {
-		theirs = bid.SC.HumanString()
-		yours = fmt.Sprintf("%v SF", bid.SF)
+	if err := checkAccept(swap); err != nil {
+		log.Fatal(err)
 	}
-	fmt.Printf("Counterparty wants to trade their %v for your %v.\n", theirs, yours)
-	fmt.Print("Accept? [y/n]: ")
+	summarize(swap)
+	fmt.Print("Accept this swap? [y/n]: ")
 	var resp string
 	fmt.Scanln(&resp)
 	if strings.ToLower(resp) != "y" {
-		log.Fatal("Trade cancelled.")
+		log.Fatal("Swap cancelled.")
 	}
-
-	fillTxn, err := fillBidTxn(bid)
+	err = acceptSwap(&swap)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	// sign
-	wspr, err := siad.WalletSignPost(fillTxn, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	encoded, err := json.Marshal(wspr)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("Bid filled successfully.")
-	fmt.Println("Transaction:", base64.StdEncoding.EncodeToString(encoded))
+	fmt.Println("Swap accepted!")
+	fmt.Println("ID:", swap.Transaction().ID())
+	fmt.Println()
+	fmt.Println("To proceed, ask your counterparty to run the following command:")
+	fmt.Println()
+	fmt.Println("    embc finish", encodeSwap(swap))
 }
 
-func completeTransaction(txnStr string) {
-	decoded, err := base64.StdEncoding.DecodeString(txnStr)
+func finish(swapStr string) {
+	swap, err := decodeSwap(swapStr)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	var txn types.Transaction
-	if err := json.Unmarshal(decoded, &txn); err != nil {
+	if err := checkFinish(swap); err != nil {
 		log.Fatal(err)
 	}
-
-	// sign and broadcast
-	signed, err := siad.WalletSignPost(txn, nil)
+	summarize(swap)
+	fmt.Print("Sign and broadcast this transaction? [y/n]: ")
+	var resp string
+	fmt.Scanln(&resp)
+	if strings.ToLower(resp) != "y" {
+		log.Fatal("Swap cancelled.")
+	}
+	err = finishSwap(&swap)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err := siad.TransactionPoolRawPost(signed.Transaction, nil); err != nil {
+	if err := siad.TransactionPoolRawPost(swap.Transaction(), nil); err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("Successfully broadcasted trade")
+	fmt.Println("Successfully broadcast swap transaction!")
+	fmt.Println("ID:", swap.Transaction().ID())
+}
+
+func summarize(swap swapTransaction) {
+	wag, err := siad.WalletAddressesGet()
+	if err != nil {
+		log.Fatal(err)
+	}
+	var receiveSC bool
+	for _, addr := range wag.Addresses {
+		if swap.SiacoinOutputs[0].UnlockHash == addr {
+			receiveSC = true
+			break
+		}
+	}
+	ours := swap.SiacoinOutputs[0].Value.HumanString() + " SC"
+	theirs := swap.SiafundOutputs[0].Value.String() + " SF"
+	if !receiveSC {
+		ours, theirs = theirs, ours
+	}
+	fmt.Println("Swap summary:")
+	fmt.Println("  You receive           ", ours)
+	fmt.Println("  Counterparty receives ", theirs)
+	if !receiveSC {
+		fmt.Println("  You will also pay the 5 SC transaction fee.")
+	}
 }
 
 func parseCurrency(amount string) types.Currency {
@@ -557,4 +273,291 @@ func formatCurrency(c types.Currency) string {
 	denom := new(big.Rat).SetInt(mag.Big())
 	res, _ := new(big.Rat).Mul(num, denom.Inv(denom)).Float64()
 	return fmt.Sprintf("%.4g %s", res, unit)
+}
+
+func encodeSwap(swap swapTransaction) string {
+	return base64.StdEncoding.EncodeToString(encoding.Marshal(swap))
+}
+
+func decodeSwap(s string) (swapTransaction, error) {
+	data, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		return swapTransaction{}, err
+	}
+	var swap swapTransaction
+	err = encoding.Unmarshal(data, &swap)
+	return swap, err
+}
+
+func addSC(swap *swapTransaction, amount types.Currency) error {
+	wug, err := siad.WalletUnspentGet()
+	if err != nil {
+		return err
+	}
+	var inputSum types.Currency
+	for _, u := range wug.Outputs {
+		if u.FundType == types.SpecifierSiacoinOutput {
+			wucg, err := siad.WalletUnlockConditionsGet(u.UnlockHash)
+			if err != nil {
+				return err
+			}
+			swap.SiacoinInputs = append(swap.SiacoinInputs, types.SiacoinInput{
+				ParentID:         types.SiacoinOutputID(u.ID),
+				UnlockConditions: wucg.UnlockConditions,
+			})
+			inputSum = inputSum.Add(u.Value)
+			if inputSum.Cmp(amount) >= 0 {
+				break
+			}
+		}
+	}
+	if inputSum.Cmp(amount) < 0 {
+		return errors.New("insufficient funds")
+	}
+	// add a change output, if necessary
+	if !inputSum.Equals(amount) {
+		wag, err := siad.WalletAddressGet()
+		if err != nil {
+			return err
+		}
+		swap.SiacoinOutputs = append(swap.SiacoinOutputs, types.SiacoinOutput{
+			UnlockHash: wag.Address,
+			Value:      inputSum.Sub(amount),
+		})
+	}
+	return nil
+}
+
+func addSF(swap *swapTransaction, amount types.Currency) error {
+	wug, err := siad.WalletUnspentGet()
+	if err != nil {
+		return err
+	}
+	wag, err := siad.WalletAddressGet()
+	if err != nil {
+		return err
+	}
+	var inputSum types.Currency
+	for _, u := range wug.Outputs {
+		if u.FundType == types.SpecifierSiafundOutput {
+			wucg, err := siad.WalletUnlockConditionsGet(u.UnlockHash)
+			if err != nil {
+				return err
+			}
+			swap.SiafundInputs = append(swap.SiafundInputs, types.SiafundInput{
+				ParentID:         types.SiafundOutputID(u.ID),
+				UnlockConditions: wucg.UnlockConditions,
+				ClaimUnlockHash:  wag.Address,
+			})
+			inputSum = inputSum.Add(u.Value)
+			if inputSum.Cmp(amount) >= 0 {
+				break
+			}
+		}
+	}
+	if inputSum.Cmp(amount) < 0 {
+		return errors.New("insufficient funds")
+	}
+	// add a change output, if necessary
+	if !inputSum.Equals(amount) {
+		swap.SiafundOutputs = append(swap.SiafundOutputs, types.SiafundOutput{
+			UnlockHash: wag.Address,
+			Value:      inputSum.Sub(amount),
+		})
+	}
+	return nil
+}
+
+func signSC(swap *swapTransaction) error {
+	oldSigs := swap.Signatures
+	swap.Signatures = nil
+	for _, sci := range swap.SiacoinInputs {
+		swap.Signatures = append(swap.Signatures, types.TransactionSignature{
+			ParentID:       crypto.Hash(sci.ParentID),
+			PublicKeyIndex: 0,
+			CoveredFields:  types.FullCoveredFields,
+		})
+	}
+	txn := swap.Transaction()
+	wspr, err := siad.WalletSignPost(txn, nil)
+	swap.Signatures = append(oldSigs, wspr.Transaction.TransactionSignatures...)
+	return err
+}
+
+func signSF(swap *swapTransaction) error {
+	oldSigs := swap.Signatures
+	swap.Signatures = nil
+	for _, sfi := range swap.SiafundInputs {
+		swap.Signatures = append(swap.Signatures, types.TransactionSignature{
+			ParentID:       crypto.Hash(sfi.ParentID),
+			PublicKeyIndex: 0,
+			CoveredFields:  types.FullCoveredFields,
+		})
+	}
+	txn := swap.Transaction()
+	wspr, err := siad.WalletSignPost(txn, nil)
+	swap.Signatures = append(oldSigs, wspr.Transaction.TransactionSignatures...)
+	return err
+}
+
+func createSwap(inputAmount, outputAmount types.Currency, offeringSF bool) (swapTransaction, error) {
+	wag, err := siad.WalletAddressGet()
+	if err != nil {
+		return swapTransaction{}, err
+	}
+	var swap swapTransaction
+	if offeringSF {
+		swap.SiacoinOutputs = append(swap.SiacoinOutputs, types.SiacoinOutput{
+			Value:      outputAmount,
+			UnlockHash: wag.Address,
+		})
+		swap.SiafundOutputs = append(swap.SiafundOutputs, types.SiafundOutput{
+			Value:      inputAmount,
+			UnlockHash: types.UnlockHash{}, // to be filled in by counterparty
+		})
+		if err := addSF(&swap, inputAmount); err != nil {
+			return swapTransaction{}, err
+		}
+	} else {
+		swap.SiacoinOutputs = append(swap.SiacoinOutputs, types.SiacoinOutput{
+			Value:      inputAmount,
+			UnlockHash: types.UnlockHash{}, // to be filled in by counterparty
+		})
+		swap.SiafundOutputs = append(swap.SiafundOutputs, types.SiafundOutput{
+			Value:      outputAmount,
+			UnlockHash: wag.Address,
+		})
+		// the party that contributes SC is responsible for paying the miner fee
+		if err := addSC(&swap, inputAmount.Add(minerFee)); err != nil {
+			return swapTransaction{}, err
+		}
+	}
+	return swap, nil
+}
+
+func checkAccept(swap swapTransaction) error {
+	if len(swap.SiacoinInputs) == 0 && len(swap.SiafundInputs) == 0 {
+		return errors.New("transaction has no inputs")
+	} else if len(swap.SiacoinInputs) > 0 && len(swap.SiafundInputs) > 0 {
+		return errors.New("only one set of inputs should be provided")
+	} else if len(swap.SiacoinOutputs) == 0 && len(swap.SiafundOutputs) == 0 {
+		return errors.New("transaction has no outputs")
+	} else if swap.SiacoinOutputs[0].UnlockHash == (types.UnlockHash{}) && swap.SiafundOutputs[0].UnlockHash == (types.UnlockHash{}) {
+		return errors.New("one output address should be left unspecified")
+	} else if len(swap.Signatures) > 0 {
+		return errors.New("transaction should not have any signatures yet")
+	}
+	return nil
+}
+
+func acceptSwap(swap *swapTransaction) error {
+	wag, err := siad.WalletAddressGet()
+	if err != nil {
+		return err
+	}
+	if len(swap.SiacoinInputs) == 0 {
+		swap.SiafundOutputs[0].UnlockHash = wag.Address
+		if err := addSC(swap, swap.SiacoinOutputs[0].Value.Add(minerFee)); err != nil {
+			return err
+		}
+		return signSC(swap)
+	} else {
+		swap.SiacoinOutputs[0].UnlockHash = wag.Address
+		if err := addSF(swap, swap.SiafundOutputs[0].Value); err != nil {
+			return err
+		}
+		return signSF(swap)
+	}
+}
+
+func checkFinish(swap swapTransaction) error {
+	if len(swap.SiacoinInputs) == 0 || len(swap.SiafundInputs) == 0 {
+		return errors.New("transaction is missing inputs")
+	} else if len(swap.SiacoinOutputs) == 0 || len(swap.SiafundOutputs) == 0 {
+		return errors.New("transaction is missing outputs")
+	} else if swap.SiacoinOutputs[0].UnlockHash == (types.UnlockHash{}) || swap.SiafundOutputs[0].UnlockHash == (types.UnlockHash{}) {
+		return errors.New("one or both swap output addresses have been left unspecified")
+	} else if len(swap.Signatures) == 0 {
+		return errors.New("transaction is missing counterparty signatures")
+	}
+
+	wag, err := siad.WalletAddressesGet()
+	if err != nil {
+		return err
+	}
+	belongsToUs := make(map[types.UnlockHash]bool)
+	for _, addr := range wag.Addresses {
+		belongsToUs[addr] = true
+	}
+
+	var haveSCSignature bool
+	for _, sci := range swap.SiacoinInputs {
+		if crypto.Hash(sci.ParentID) == swap.Signatures[0].ParentID {
+			haveSCSignature = true
+			break
+		}
+	}
+	if haveSCSignature {
+		// all of the SF inputs should belong to us
+		for _, sfi := range swap.SiafundInputs {
+			if !belongsToUs[sfi.UnlockConditions.UnlockHash()] {
+				return errors.New("counterparty added an SF input that does not belong to us")
+			}
+		}
+		// none of the SC inputs should belong to us
+		for _, sci := range swap.SiacoinInputs {
+			if belongsToUs[sci.UnlockConditions.UnlockHash()] {
+				return errors.New("counterparty added an SC input that belongs to us")
+			}
+		}
+		// all of the SF change outputs should belong to us
+		for _, sfo := range swap.SiafundOutputs[1:] {
+			if !belongsToUs[sfo.UnlockHash] {
+				return errors.New("counterparty added an SF output that does not belong to us")
+			}
+		}
+		// the SC output should belong to us
+		if !belongsToUs[swap.SiacoinOutputs[0].UnlockHash] {
+			return errors.New("the SC output address does not belong to us")
+		}
+	} else {
+		// all of the SC inputs should belong to us
+		for _, sci := range swap.SiacoinInputs {
+			if !belongsToUs[sci.UnlockConditions.UnlockHash()] {
+				return errors.New("counterparty added an SC input that does not belong to us")
+			}
+		}
+		// none of the SF inputs should belong to us
+		for _, sfi := range swap.SiafundInputs {
+			if belongsToUs[sfi.UnlockConditions.UnlockHash()] {
+				return errors.New("counterparty added an SF input that belongs to us")
+			}
+		}
+		// all of the SC change outputs should belong to us
+		for _, sco := range swap.SiacoinOutputs[1:] {
+			if !belongsToUs[sco.UnlockHash] {
+				return errors.New("counterparty added an SC output that does not belong to us")
+			}
+		}
+		// the SF output should belong to us
+		if !belongsToUs[swap.SiafundOutputs[0].UnlockHash] {
+			return errors.New("the SF output address does not belong to us")
+		}
+	}
+	return nil
+}
+
+func finishSwap(swap *swapTransaction) error {
+	var haveSCSignatures bool
+	for _, sci := range swap.SiacoinInputs {
+		if crypto.Hash(sci.ParentID) == swap.Signatures[0].ParentID {
+			haveSCSignatures = true
+			break
+		}
+	}
+	if haveSCSignatures {
+		return signSF(swap)
+	} else {
+		return signSC(swap)
+	}
 }
