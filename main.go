@@ -211,7 +211,7 @@ func summarize(swap swapTransaction) {
 			break
 		}
 	}
-	ours := swap.SiacoinOutputs[0].Value.HumanString() + " SC"
+	ours := swap.SiacoinOutputs[0].Value.HumanString()
 	theirs := swap.SiafundOutputs[0].Value.String() + " SF"
 	if !receiveSC {
 		ours, theirs = theirs, ours
@@ -369,34 +369,34 @@ func addSF(swap *swapTransaction, amount types.Currency) error {
 }
 
 func signSC(swap *swapTransaction) error {
-	oldSigs := swap.Signatures
-	swap.Signatures = nil
+	var toSign []crypto.Hash
 	for _, sci := range swap.SiacoinInputs {
 		swap.Signatures = append(swap.Signatures, types.TransactionSignature{
 			ParentID:       crypto.Hash(sci.ParentID),
 			PublicKeyIndex: 0,
 			CoveredFields:  types.FullCoveredFields,
 		})
+		toSign = append(toSign, crypto.Hash(sci.ParentID))
 	}
 	txn := swap.Transaction()
-	wspr, err := siad.WalletSignPost(txn, nil)
-	swap.Signatures = append(oldSigs, wspr.Transaction.TransactionSignatures...)
+	wspr, err := siad.WalletSignPost(txn, toSign)
+	swap.Signatures = wspr.Transaction.TransactionSignatures
 	return err
 }
 
 func signSF(swap *swapTransaction) error {
-	oldSigs := swap.Signatures
-	swap.Signatures = nil
+	var toSign []crypto.Hash
 	for _, sfi := range swap.SiafundInputs {
 		swap.Signatures = append(swap.Signatures, types.TransactionSignature{
 			ParentID:       crypto.Hash(sfi.ParentID),
 			PublicKeyIndex: 0,
 			CoveredFields:  types.FullCoveredFields,
 		})
+		toSign = append(toSign, crypto.Hash(sfi.ParentID))
 	}
 	txn := swap.Transaction()
-	wspr, err := siad.WalletSignPost(txn, nil)
-	swap.Signatures = append(oldSigs, wspr.Transaction.TransactionSignatures...)
+	wspr, err := siad.WalletSignPost(txn, toSign)
+	swap.Signatures = wspr.Transaction.TransactionSignatures
 	return err
 }
 
