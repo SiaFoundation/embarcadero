@@ -20,8 +20,8 @@ var (
     embc [flags] [action]
 
 Actions:
-    create        create a swap transaction
-    accept        accept a swap transaction
+	create        create a swap transaction
+	accept        accept a swap transaction
 	finish        sign + broadcast a swap transaction
 `
 	createUsage = `Usage:
