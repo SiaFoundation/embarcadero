@@ -9,30 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"strings"
-
-	"gitlab.com/NebulousLabs/Sia/modules"
-	"gitlab.com/NebulousLabs/Sia/types"
 )
-
-// BidPrefix is the identifier for embarcadero bids in arbitrary data.
-var BidPrefix = append(modules.PrefixNonSia[:], "embarcadero"...)
-
-// A Trade is a SF<->SC transaction.
-type Trade struct {
-	Bid         Bid
-	Transaction types.Transaction
-	Height      types.BlockHeight
-}
-
-// A Bid is an unfilled trade.
-type Bid struct {
-	Transaction types.Transaction
-	ID          types.OutputID
-	Height      types.BlockHeight
-	SF, SC      types.Currency
-	OfferingSF  bool
-	Invalid     bool `json:"omitempty"`
-}
 
 // A Client connects to an embarcadero server.
 type Client struct {
@@ -67,6 +44,9 @@ func (c *Client) req(method string, route string, data, resp interface{}) error 
 }
 
 func (c *Client) get(route string, r interface{}) error { return c.req("GET", route, nil, r) }
+func (c *Client) post(route string, d interface{}, r interface{}) error {
+	return c.req("POST", route, d, r)
+}
 
 // Trades returns all trades known to the embarcadero server.
 func (c *Client) Trades() (ts []Trade, err error) {
@@ -77,6 +57,31 @@ func (c *Client) Trades() (ts []Trade, err error) {
 // Bids returns all bids known to the embarcadero server.
 func (c *Client) Bids() (bs []Bid, err error) {
 	err = c.get("/bids", &bs)
+	return
+}
+
+type FillBidParams struct {
+	fillStr string
+	skynet  bool
+	b64     bool
+}
+
+func (c *Client) FillBid(fillStr string, skynet bool, b64 bool) (r string, err error) {
+	params := FillBidParams{fillStr: fillStr, skynet: skynet, b64: b64}
+	err = c.post("/bids/fill", params, r)
+	return
+}
+
+type PlaceBidParams struct {
+	inStr  string
+	outStr string
+	skynet bool
+	b64    bool
+}
+
+func (c *Client) PlaceBid(inStr string, outStr string, skynet bool, b64 bool) (r string, err error) {
+	params := PlaceBidParams{inStr: inStr, outStr: outStr, skynet: skynet, b64: b64}
+	err = c.post("/bids/place", params, r)
 	return
 }
 
