@@ -10,11 +10,33 @@ import (
 	"reflect"
 
 	"github.com/julienschmidt/httprouter"
+	"go.sia.tech/embarcadero/api"
+	"go.sia.tech/embarcadero/static"
 )
 
-type response struct {
-	status int
-	data   map[string]interface{}
+func writeResponse(w http.ResponseWriter, r api.Response, data interface{}) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	response := make(map[string]interface{})
+	response["status"] = r.Status
+	response["message"] = r.Message
+	response["data"] = data
+
+	fmt.Println(response)
+
+	writeJSON(w, response)
+}
+
+func writeErrorResponse(w http.ResponseWriter, err error) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	response := make(map[string]interface{})
+	response["status"] = 500
+	response["message"] = err.Error()
+
+	fmt.Println(response)
+
+	writeJSON(w, response)
 }
 
 func writeJSON(w http.ResponseWriter, v interface{}) {
@@ -25,82 +47,83 @@ func writeJSON(w http.ResponseWriter, v interface{}) {
 		return
 	}
 	enc := json.NewEncoder(w)
-	enc.SetIndent("", "\t")
+	enc.SetIndent("", "  ")
 	enc.Encode(v)
 }
 
-func postCreate(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	inStr := ps.ByName("inStr")
-	outStr := ps.ByName("outStr")
-
-	Create(inStr, outStr)
-
-	response := response{
-		status: 200,
-		data: map[string]interface{}{
-			"status": "success",
-		},
-	}
-
-	writeJSON(w, response)
+type CreatePayload struct {
+	InStr  string `json:"inStr"`
+	OutStr string `json:"outStr"`
 }
 
-func postAccept(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func Create(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	// inStr := ps.ByName("inStr")
+	// outStr := ps.ByName("outStr")
+	decoder := json.NewDecoder(r.Body)
+	payload := CreatePayload{}
+	err := decoder.Decode(&payload)
+
+	if err != nil {
+		writeErrorResponse(w, err)
+		return
+	}
+
+	fmt.Println(ps)
+
+	response := api.Create(payload.InStr, payload.OutStr)
+	data := make(map[string]interface{})
+
+	writeResponse(w, response, data)
+}
+
+func Accept(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	swapStr := ps.ByName("swapStr")
 
-	Accept(swapStr)
+	fmt.Println(swapStr)
 
-	response := response{
-		status: 200,
-		data: map[string]interface{}{
-			"status": "success",
-		},
-	}
+	response := api.Accept(swapStr)
+	data := make(map[string]interface{})
 
-	writeJSON(w, response)
+	writeResponse(w, response, data)
 }
 
-func postFinish(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+func Finish(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 	swapStr := ps.ByName("swapStr")
 
-	Finish(swapStr)
+	fmt.Println(swapStr)
 
-	response := response{
-		status: 200,
-		data: map[string]interface{}{
-			"status": "success",
-		},
-	}
+	response := api.Finish(swapStr)
+	data := make(map[string]interface{})
 
-	writeJSON(w, response)
-}
-
-func getPing(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	fmt.Fprint(w, "Success")
-
-	response := response{
-		status: 200,
-		data: map[string]interface{}{
-			"status": "success",
-		},
-	}
-
-	writeJSON(w, response)
+	writeResponse(w, response, data)
 }
 
 func setup(apiPort string) {
-	apiAddr := "locahost:" + apiPort
+	apiAddr := "localhost:" + apiPort
 	router := httprouter.New()
 
 	// API
-	router.POST("/api/create", postCreate)
-	router.POST("/api/accept", postAccept)
-	router.POST("/api/finish", postFinish)
-	router.GET("/api/ping", getPing)
+	router.POST("/api/create", Create)
+	router.POST("/api/accept", Accept)
+	router.POST("/api/finish", Finish)
 
 	// UI
-	handlerUI := buildUIHandler()
+	handlerUI := static.BuildUIHandler()
 	router.NotFound = handlerUI
+
+	// CORS, for development only
+	router.GlobalOPTIONS = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Access-Control-Request-Method") != "" {
+			// Set CORS headers
+			header := w.Header()
+			header.Set("Access-Control-Allow-Headers", "content-type")
+			header.Set("Access-Control-Allow-Methods", header.Get("Allow"))
+			header.Set("Access-Control-Allow-Origin", "*")
+		}
+
+		// Adjust status code to 204
+		w.WriteHeader(http.StatusNoContent)
+	})
 
 	go func() {
 		if err := http.ListenAndServe(apiAddr, router); err != nil && err != http.ErrServerClosed {
@@ -110,7 +133,7 @@ func setup(apiPort string) {
 	log.Printf("Listening on %v...", apiAddr)
 }
 
-func serve(apiAddr string) {
+func Serve(apiAddr string) {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt)
 

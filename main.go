@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"log"
 
+	"go.sia.tech/embarcadero/cli"
+	"go.sia.tech/embarcadero/core"
+	"go.sia.tech/embarcadero/web"
 	"go.sia.tech/siad/node/api/client"
 	"lukechampine.com/flagg"
-	"github.com/SiaFoundation/embarcadero/cli"
-	"github.com/SiaFoundation/embarcadero/web"
 )
 
 var (
@@ -18,6 +19,7 @@ Actions:
 	create        create a swap transaction
 	accept        accept a swap transaction
 	finish        sign + broadcast a swap transaction
+	ui            start the web UI
 `
 	createUsage = `Usage:
 embc create [ours] [theirs]
@@ -83,7 +85,7 @@ func main() {
 	// initialize client
 	opts, _ := client.DefaultOptions()
 	opts.Address = *siadAddr
-	Siad = client.New(opts)
+	core.Siad = client.New(opts)
 
 	// handle command
 	switch cmd {
@@ -98,23 +100,23 @@ func main() {
 			cmd.Usage()
 			return
 		}
-		CliCreate(args[0], args[1])
+		cli.Create(args[0], args[1])
 	case acceptCmd:
 		if len(args) != 1 {
 			cmd.Usage()
 			return
 		}
-		CliAccept(args[0])
+		cli.Accept(args[0])
 	case finishCmd:
 		if len(args) != 1 {
 			cmd.Usage()
 			return
 		}
-		CliFinish(args[0])
+		cli.Finish(args[0])
 	case uiCmd:
 		if len(args) != 0 {
-			Serve(args[1])
+			web.Serve(args[1])
 		}
-		Serve("9981")
+		web.Serve("9981")
 	}
 }

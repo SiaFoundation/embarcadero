@@ -1,4 +1,4 @@
-module github.com/SiaFoundation/embarcadero
+module go.sia.tech/embarcadero
 
 go 1.17
 
