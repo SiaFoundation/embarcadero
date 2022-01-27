@@ -1,4 +1,4 @@
-package main
+package core
 
 import (
 	"encoding/base64"
@@ -12,104 +12,9 @@ import (
 	"go.sia.tech/siad/crypto"
 	"go.sia.tech/siad/node/api/client"
 	"go.sia.tech/siad/types"
-	"lukechampine.com/flagg"
 )
 
-var (
-	rootUsage = `Usage:
-    embc [flags] [action]
-
-Actions:
-	create        create a swap transaction
-	accept        accept a swap transaction
-	finish        sign + broadcast a swap transaction
-`
-	createUsage = `Usage:
-embc create [ours] [theirs]
-
-Creates a transaction that swaps SC for SF, or vice versa. For example:
-
-	embc create 7MS 2SF
-	
-creates a transaction that swaps your 7 MS for the counterparty's 2 SF.
-The transaction is unsigned, and only contains inputs from your wallet.
-The counterparty must add their own inputs with 'embc accept' before the
-transaction can be signed and broadcast.
-`
-	acceptUsage = `Usage:
-embc accept [txn]
-
-Displays a proposed swap transaction. If you accept the proposal, your inputs
-will be added to complete the swap. The resulting transaction must be returned
-to the original party and countersigned with 'embc finish' before it is valid
-and ready for broadcasting.
-`
-
-	finishUsage = `Usage:
-embc finish [txn]
-
-Displays a proposed swap transaction. If you accept the proposal, your
-signatures will be added, finalizing the transaction. The transaction is then
-broadcasted.
-`
-)
-
-var siad *client.Client
-
-func main() {
-	log.SetFlags(0)
-
-	rootCmd := flagg.Root
-	rootCmd.Usage = flagg.SimpleUsage(rootCmd, rootUsage)
-	siadAddr := rootCmd.String("siad", "localhost:9980", "host:port that the siad API is running on")
-
-	createCmd := flagg.New("create", createUsage)
-	acceptCmd := flagg.New("accept", acceptUsage)
-	finishCmd := flagg.New("finish", finishUsage)
-
-	cmd := flagg.Parse(flagg.Tree{
-		Cmd: rootCmd,
-		Sub: []flagg.Tree{
-			{Cmd: createCmd},
-			{Cmd: acceptCmd},
-			{Cmd: finishCmd},
-		},
-	})
-	args := cmd.Args()
-
-	// initialize client
-	opts, _ := client.DefaultOptions()
-	opts.Address = *siadAddr
-	siad = client.New(opts)
-
-	// handle command
-	switch cmd {
-	case rootCmd:
-		if len(args) > 0 {
-			cmd.Usage()
-			return
-		}
-		fmt.Println("embc v0.1.0")
-	case createCmd:
-		if len(args) != 2 {
-			cmd.Usage()
-			return
-		}
-		create(args[0], args[1])
-	case acceptCmd:
-		if len(args) != 1 {
-			cmd.Usage()
-			return
-		}
-		accept(args[0])
-	case finishCmd:
-		if len(args) != 1 {
-			cmd.Usage()
-			return
-		}
-		finish(args[0])
-	}
-}
+var Siad *client.Client
 
 var minerFee = types.SiacoinPrecision.Mul64(5)
 
@@ -132,75 +37,8 @@ func (swap *swapTransaction) Transaction() types.Transaction {
 	}
 }
 
-func create(inStr, outStr string) {
-	if strings.Contains(inStr, "SF") == strings.Contains(outStr, "SF") {
-		log.Fatal("Invalid swap: must specify one SC value and one SF value")
-	}
-	input, output := parseCurrency(inStr), parseCurrency(outStr)
-	swap, err := createSwap(input, output, strings.Contains(inStr, "SF"))
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("To proceed, ask your counterparty to run the following command:")
-	fmt.Println()
-	fmt.Println("    embc accept", encodeSwap(swap))
-}
-
-func accept(swapStr string) {
-	swap, err := decodeSwap(swapStr)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := checkAccept(swap); err != nil {
-		log.Fatal(err)
-	}
-	summarize(swap)
-	fmt.Print("Accept this swap? [y/n]: ")
-	var resp string
-	fmt.Scanln(&resp)
-	if strings.ToLower(resp) != "y" {
-		log.Fatal("Swap cancelled.")
-	}
-	err = acceptSwap(&swap)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("Swap accepted!")
-	fmt.Println("ID:", swap.Transaction().ID())
-	fmt.Println()
-	fmt.Println("To proceed, ask your counterparty to run the following command:")
-	fmt.Println()
-	fmt.Println("    embc finish", encodeSwap(swap))
-}
-
-func finish(swapStr string) {
-	swap, err := decodeSwap(swapStr)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := checkFinish(swap); err != nil {
-		log.Fatal(err)
-	}
-	summarize(swap)
-	fmt.Print("Sign and broadcast this transaction? [y/n]: ")
-	var resp string
-	fmt.Scanln(&resp)
-	if strings.ToLower(resp) != "y" {
-		log.Fatal("Swap cancelled.")
-	}
-	err = finishSwap(&swap)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err := siad.TransactionPoolRawPost(swap.Transaction(), nil); err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("Successfully broadcast swap transaction!")
-	fmt.Println("ID:", swap.Transaction().ID())
-}
-
-func summarize(swap swapTransaction) {
-	wag, err := siad.WalletAddressesGet()
+func Summarize(swap swapTransaction) {
+	wag, err := Siad.WalletAddressesGet()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -224,7 +62,7 @@ func summarize(swap swapTransaction) {
 	}
 }
 
-func parseCurrency(amount string) types.Currency {
+func ParseCurrency(amount string) types.Currency {
 	amount = strings.TrimSpace(amount)
 	if strings.HasSuffix(amount, "SF") || strings.HasSuffix(amount, "H") {
 		i, ok := new(big.Int).SetString(strings.TrimRight(amount, "SFH"), 10)
@@ -275,11 +113,11 @@ func formatCurrency(c types.Currency) string {
 	return fmt.Sprintf("%.4g %s", res, unit)
 }
 
-func encodeSwap(swap swapTransaction) string {
+func EncodeSwap(swap swapTransaction) string {
 	return base64.StdEncoding.EncodeToString(encoding.Marshal(swap))
 }
 
-func decodeSwap(s string) (swapTransaction, error) {
+func DecodeSwap(s string) (swapTransaction, error) {
 	data, err := base64.StdEncoding.DecodeString(s)
 	if err != nil {
 		return swapTransaction{}, err
@@ -290,14 +128,14 @@ func decodeSwap(s string) (swapTransaction, error) {
 }
 
 func addSC(swap *swapTransaction, amount types.Currency) error {
-	wug, err := siad.WalletUnspentGet()
+	wug, err := Siad.WalletUnspentGet()
 	if err != nil {
 		return err
 	}
 	var inputSum types.Currency
 	for _, u := range wug.Outputs {
 		if u.FundType == types.SpecifierSiacoinOutput {
-			wucg, err := siad.WalletUnlockConditionsGet(u.UnlockHash)
+			wucg, err := Siad.WalletUnlockConditionsGet(u.UnlockHash)
 			if err != nil {
 				return err
 			}
@@ -316,7 +154,7 @@ func addSC(swap *swapTransaction, amount types.Currency) error {
 	}
 	// add a change output, if necessary
 	if !inputSum.Equals(amount) {
-		wag, err := siad.WalletAddressGet()
+		wag, err := Siad.WalletAddressGet()
 		if err != nil {
 			return err
 		}
@@ -329,18 +167,18 @@ func addSC(swap *swapTransaction, amount types.Currency) error {
 }
 
 func addSF(swap *swapTransaction, amount types.Currency) error {
-	wug, err := siad.WalletUnspentGet()
+	wug, err := Siad.WalletUnspentGet()
 	if err != nil {
 		return err
 	}
-	wag, err := siad.WalletAddressGet()
+	wag, err := Siad.WalletAddressGet()
 	if err != nil {
 		return err
 	}
 	var inputSum types.Currency
 	for _, u := range wug.Outputs {
 		if u.FundType == types.SpecifierSiafundOutput {
-			wucg, err := siad.WalletUnlockConditionsGet(u.UnlockHash)
+			wucg, err := Siad.WalletUnlockConditionsGet(u.UnlockHash)
 			if err != nil {
 				return err
 			}
@@ -379,7 +217,7 @@ func signSC(swap *swapTransaction) error {
 		toSign = append(toSign, crypto.Hash(sci.ParentID))
 	}
 	txn := swap.Transaction()
-	wspr, err := siad.WalletSignPost(txn, toSign)
+	wspr, err := Siad.WalletSignPost(txn, toSign)
 	swap.Signatures = wspr.Transaction.TransactionSignatures
 	return err
 }
@@ -395,13 +233,13 @@ func signSF(swap *swapTransaction) error {
 		toSign = append(toSign, crypto.Hash(sfi.ParentID))
 	}
 	txn := swap.Transaction()
-	wspr, err := siad.WalletSignPost(txn, toSign)
+	wspr, err := Siad.WalletSignPost(txn, toSign)
 	swap.Signatures = wspr.Transaction.TransactionSignatures
 	return err
 }
 
-func createSwap(inputAmount, outputAmount types.Currency, offeringSF bool) (swapTransaction, error) {
-	wag, err := siad.WalletAddressGet()
+func CreateSwap(inputAmount, outputAmount types.Currency, offeringSF bool) (swapTransaction, error) {
+	wag, err := Siad.WalletAddressGet()
 	if err != nil {
 		return swapTransaction{}, err
 	}
@@ -435,7 +273,7 @@ func createSwap(inputAmount, outputAmount types.Currency, offeringSF bool) (swap
 	return swap, nil
 }
 
-func checkAccept(swap swapTransaction) error {
+func CheckAccept(swap swapTransaction) error {
 	if len(swap.SiacoinInputs) == 0 && len(swap.SiafundInputs) == 0 {
 		return errors.New("transaction has no inputs")
 	} else if len(swap.SiacoinInputs) > 0 && len(swap.SiafundInputs) > 0 {
@@ -450,8 +288,8 @@ func checkAccept(swap swapTransaction) error {
 	return nil
 }
 
-func acceptSwap(swap *swapTransaction) error {
-	wag, err := siad.WalletAddressGet()
+func AcceptSwap(swap *swapTransaction) error {
+	wag, err := Siad.WalletAddressGet()
 	if err != nil {
 		return err
 	}
@@ -470,7 +308,7 @@ func acceptSwap(swap *swapTransaction) error {
 	}
 }
 
-func checkFinish(swap swapTransaction) error {
+func CheckFinish(swap swapTransaction) error {
 	if len(swap.SiacoinInputs) == 0 || len(swap.SiafundInputs) == 0 {
 		return errors.New("transaction is missing inputs")
 	} else if len(swap.SiacoinOutputs) == 0 || len(swap.SiafundOutputs) == 0 {
@@ -481,7 +319,7 @@ func checkFinish(swap swapTransaction) error {
 		return errors.New("transaction is missing counterparty signatures")
 	}
 
-	wag, err := siad.WalletAddressesGet()
+	wag, err := Siad.WalletAddressesGet()
 	if err != nil {
 		return err
 	}
@@ -547,7 +385,7 @@ func checkFinish(swap swapTransaction) error {
 	return nil
 }
 
-func finishSwap(swap *swapTransaction) error {
+func FinishSwap(swap *swapTransaction) error {
 	var haveSCSignatures bool
 	for _, sci := range swap.SiacoinInputs {
 		if crypto.Hash(sci.ParentID) == swap.Signatures[0].ParentID {
