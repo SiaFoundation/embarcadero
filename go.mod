@@ -1,4 +1,4 @@
-module gitlab.com/NebulousLabs/embarcadero
+module github.com/SiaFoundation/embarcadero
 
 go 1.14
 
