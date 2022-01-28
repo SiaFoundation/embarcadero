@@ -28,6 +28,11 @@ func writeJSON(w http.ResponseWriter, v interface{}) {
 	enc.Encode(v)
 }
 
+func writeError(w http.ResponseWriter, err string, code int) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	http.Error(w, err, code)
+}
+
 type createRequest struct {
 	Offer   string `json:"offer"`
 	Receive string `json:"receive"`
@@ -40,17 +45,17 @@ type createResponse struct {
 func createHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	var cr createRequest
 	if err := json.NewDecoder(r.Body).Decode(&cr); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	if strings.Contains(cr.Offer, "SF") == strings.Contains(cr.Receive, "SF") {
-		http.Error(w, "Invalid swap: must specify one SC value and one SF value", http.StatusBadRequest)
+		writeError(w, "Invalid swap: must specify one SC value and one SF value", http.StatusBadRequest)
 		return
 	}
 	input, output := ParseCurrency(cr.Offer), ParseCurrency(cr.Receive)
 	swap, err := CreateSwap(input, output, strings.Contains(cr.Offer, "SF"))
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	writeJSON(w, createResponse{
@@ -70,15 +75,15 @@ type acceptResponse struct {
 func acceptHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	var ar acceptRequest
 	if err := json.NewDecoder(r.Body).Decode(&ar); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	if err := CheckAccept(ar.Swap); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	if err := AcceptSwap(&ar.Swap); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, acceptResponse{
@@ -98,15 +103,15 @@ type finishResponse struct {
 func finishHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	var fr finishRequest
 	if err := json.NewDecoder(r.Body).Decode(&fr); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	if err := CheckFinish(fr.Swap); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	if err := FinishSwap(&fr.Swap); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, finishResponse{
@@ -121,12 +126,12 @@ type summarizeRequest struct {
 func summarizeHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	var fr summarizeRequest
 	if err := json.NewDecoder(r.Body).Decode(&fr); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	s, err := Summarize(fr.Swap)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	writeJSON(w, s)
@@ -135,7 +140,7 @@ func summarizeHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Param
 func walletHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	c, err := siad.WalletGet()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	writeJSON(w, c)
@@ -144,7 +149,7 @@ func walletHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 func consensusHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	c, err := siad.ConsensusGet()
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	writeJSON(w, c)
