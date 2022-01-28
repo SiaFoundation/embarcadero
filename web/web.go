@@ -14,13 +14,21 @@ import (
 	"go.sia.tech/embarcadero/static"
 )
 
-func writeResponse(w http.ResponseWriter, r api.Response, data interface{}) {
+type CreatePayload struct {
+	InStr  string `json:"inStr"`
+	OutStr string `json:"outStr"`
+}
+
+type SwapPayload struct {
+	SwapStr string `json:"swapStr"`
+}
+
+func writeResponse(w http.ResponseWriter, r api.Response) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	response := make(map[string]interface{})
 	response["status"] = r.Status
-	response["message"] = r.Message
-	response["data"] = data
+	response["data"] = r.Data
 
 	fmt.Println(response)
 
@@ -51,14 +59,19 @@ func writeJSON(w http.ResponseWriter, v interface{}) {
 	enc.Encode(v)
 }
 
-type CreatePayload struct {
-	InStr  string `json:"inStr"`
-	OutStr string `json:"outStr"`
+func getSwapStr(w http.ResponseWriter, r *http.Request, ps httprouter.Params) (string, error) {
+	decoder := json.NewDecoder(r.Body)
+	payload := SwapPayload{}
+	err := decoder.Decode(&payload)
+
+	if err != nil {
+		return "", err
+	}
+
+	return payload.SwapStr, nil
 }
 
 func Create(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	// inStr := ps.ByName("inStr")
-	// outStr := ps.ByName("outStr")
 	decoder := json.NewDecoder(r.Body)
 	payload := CreatePayload{}
 	err := decoder.Decode(&payload)
@@ -68,34 +81,64 @@ func Create(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
 		return
 	}
 
-	fmt.Println(ps)
+	fmt.Printf("Create\n\tinStr: %s\n\toutStr: %s\n\n", payload.InStr, payload.OutStr)
 
 	response := api.Create(payload.InStr, payload.OutStr)
-	data := make(map[string]interface{})
 
-	writeResponse(w, response, data)
+	writeResponse(w, response)
 }
 
 func Accept(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	swapStr := ps.ByName("swapStr")
+	swapStr, err := getSwapStr(w, r, ps)
 
-	fmt.Println(swapStr)
+	if err != nil {
+		writeErrorResponse(w, err)
+		return
+	}
 
+	fmt.Printf("Accept\n\tswapStr: %s\n\n", swapStr)
 	response := api.Accept(swapStr)
-	data := make(map[string]interface{})
-
-	writeResponse(w, response, data)
+	writeResponse(w, response)
 }
 
 func Finish(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
-	swapStr := ps.ByName("swapStr")
+	swapStr, err := getSwapStr(w, r, ps)
 
-	fmt.Println(swapStr)
+	if err != nil {
+		writeErrorResponse(w, err)
+		return
+	}
 
+	fmt.Printf("Finish\n\tswapStr: %s\n\n", swapStr)
 	response := api.Finish(swapStr)
-	data := make(map[string]interface{})
+	writeResponse(w, response)
+}
 
-	writeResponse(w, response, data)
+func Summarize(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	swapStr, err := getSwapStr(w, r, ps)
+
+	if err != nil {
+		writeErrorResponse(w, err)
+		return
+	}
+
+	fmt.Printf("Summarize\n\tswapStr: %s\n\n", swapStr)
+	response := api.Summarize(swapStr)
+	writeResponse(w, response)
+}
+
+func Consensus(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	response := api.Consensus()
+
+	fmt.Printf("Consensus\n\n")
+	writeResponse(w, response)
+}
+
+func Wallet(w http.ResponseWriter, r *http.Request, ps httprouter.Params) {
+	response := api.Wallet()
+
+	fmt.Printf("Wallet\n\n")
+	writeResponse(w, response)
 }
 
 func setup(apiPort string) {
@@ -106,6 +149,9 @@ func setup(apiPort string) {
 	router.POST("/api/create", Create)
 	router.POST("/api/accept", Accept)
 	router.POST("/api/finish", Finish)
+	router.POST("/api/summarize", Summarize)
+	router.GET("/api/consensus", Consensus)
+	router.GET("/api/wallet", Wallet)
 
 	// UI
 	handlerUI := static.BuildUIHandler()
