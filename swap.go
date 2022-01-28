@@ -1,4 +1,4 @@
-package core
+package main
 
 import (
 	"encoding/base64"
@@ -14,7 +14,7 @@ import (
 	"go.sia.tech/siad/types"
 )
 
-var Siad *client.Client
+var siad *client.Client
 
 var minerFee = types.SiacoinPrecision.Mul64(5)
 
@@ -35,33 +35,6 @@ func (swap *SwapTransaction) Transaction() types.Transaction {
 		MinerFees:             []types.Currency{minerFee},
 		TransactionSignatures: swap.Signatures,
 	}
-}
-
-func Summarize(swap SwapTransaction) (string, error) {
-	wag, err := Siad.WalletAddressesGet()
-	if err != nil {
-		return "", err
-	}
-	var receiveSC bool
-	for _, addr := range wag.Addresses {
-		if swap.SiacoinOutputs[0].UnlockHash == addr {
-			receiveSC = true
-			break
-		}
-	}
-	ours := swap.SiacoinOutputs[0].Value.HumanString()
-	theirs := swap.SiafundOutputs[0].Value.String() + " SF"
-	if !receiveSC {
-		ours, theirs = theirs, ours
-	}
-	message := fmt.Sprintln("Swap summary:")
-	message += fmt.Sprintln("  You receive           ", ours)
-	message += fmt.Sprintln("  Counterparty receives ", theirs)
-	if !receiveSC {
-		message += fmt.Sprintln("  You will also pay the 5 SC transaction fee.")
-	}
-
-	return message, nil
 }
 
 func ParseCurrency(amount string) types.Currency {
@@ -130,14 +103,14 @@ func DecodeSwap(s string) (SwapTransaction, error) {
 }
 
 func addSC(swap *SwapTransaction, amount types.Currency) error {
-	wug, err := Siad.WalletUnspentGet()
+	wug, err := siad.WalletUnspentGet()
 	if err != nil {
 		return err
 	}
 	var inputSum types.Currency
 	for _, u := range wug.Outputs {
 		if u.FundType == types.SpecifierSiacoinOutput {
-			wucg, err := Siad.WalletUnlockConditionsGet(u.UnlockHash)
+			wucg, err := siad.WalletUnlockConditionsGet(u.UnlockHash)
 			if err != nil {
 				return err
 			}
@@ -156,7 +129,7 @@ func addSC(swap *SwapTransaction, amount types.Currency) error {
 	}
 	// add a change output, if necessary
 	if !inputSum.Equals(amount) {
-		wag, err := Siad.WalletAddressGet()
+		wag, err := siad.WalletAddressGet()
 		if err != nil {
 			return err
 		}
@@ -169,18 +142,18 @@ func addSC(swap *SwapTransaction, amount types.Currency) error {
 }
 
 func addSF(swap *SwapTransaction, amount types.Currency) error {
-	wug, err := Siad.WalletUnspentGet()
+	wug, err := siad.WalletUnspentGet()
 	if err != nil {
 		return err
 	}
-	wag, err := Siad.WalletAddressGet()
+	wag, err := siad.WalletAddressGet()
 	if err != nil {
 		return err
 	}
 	var inputSum types.Currency
 	for _, u := range wug.Outputs {
 		if u.FundType == types.SpecifierSiafundOutput {
-			wucg, err := Siad.WalletUnlockConditionsGet(u.UnlockHash)
+			wucg, err := siad.WalletUnlockConditionsGet(u.UnlockHash)
 			if err != nil {
 				return err
 			}
@@ -219,7 +192,7 @@ func signSC(swap *SwapTransaction) error {
 		toSign = append(toSign, crypto.Hash(sci.ParentID))
 	}
 	txn := swap.Transaction()
-	wspr, err := Siad.WalletSignPost(txn, toSign)
+	wspr, err := siad.WalletSignPost(txn, toSign)
 	swap.Signatures = wspr.Transaction.TransactionSignatures
 	return err
 }
@@ -235,13 +208,13 @@ func signSF(swap *SwapTransaction) error {
 		toSign = append(toSign, crypto.Hash(sfi.ParentID))
 	}
 	txn := swap.Transaction()
-	wspr, err := Siad.WalletSignPost(txn, toSign)
+	wspr, err := siad.WalletSignPost(txn, toSign)
 	swap.Signatures = wspr.Transaction.TransactionSignatures
 	return err
 }
 
 func CreateSwap(inputAmount, outputAmount types.Currency, offeringSF bool) (SwapTransaction, error) {
-	wag, err := Siad.WalletAddressGet()
+	wag, err := siad.WalletAddressGet()
 	if err != nil {
 		return SwapTransaction{}, err
 	}
@@ -291,7 +264,7 @@ func CheckAccept(swap SwapTransaction) error {
 }
 
 func AcceptSwap(swap *SwapTransaction) error {
-	wag, err := Siad.WalletAddressGet()
+	wag, err := siad.WalletAddressGet()
 	if err != nil {
 		return err
 	}
@@ -321,7 +294,7 @@ func CheckFinish(swap SwapTransaction) error {
 		return errors.New("transaction is missing counterparty signatures")
 	}
 
-	wag, err := Siad.WalletAddressesGet()
+	wag, err := siad.WalletAddressesGet()
 	if err != nil {
 		return err
 	}
@@ -395,9 +368,14 @@ func FinishSwap(swap *SwapTransaction) error {
 			break
 		}
 	}
+	var err error
 	if haveSCSignatures {
-		return signSF(swap)
+		err = signSF(swap)
 	} else {
-		return signSC(swap)
+		err = signSC(swap)
 	}
+	if err != nil {
+		return err
+	}
+	return siad.TransactionPoolRawPost(swap.Transaction(), nil)
 }
