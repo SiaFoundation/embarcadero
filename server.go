@@ -13,7 +13,6 @@ import (
 	"strings"
 
 	"github.com/julienschmidt/httprouter"
-	"go.sia.tech/embarcadero/static"
 )
 
 func writeJSON(w http.ResponseWriter, v interface{}) {
@@ -110,23 +109,63 @@ func finishHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	writeJSON(w, acceptResponse{
+	writeJSON(w, finishResponse{
 		ID: fr.Swap.Transaction().ID().String(),
 	})
 }
 
+type summarizeRequest struct {
+	Swap SwapTransaction `json:"transaction"`
+}
+
+func summarizeHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	var fr summarizeRequest
+	if err := json.NewDecoder(r.Body).Decode(&fr); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	s, err := Summarize(fr.Swap)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, s)
+}
+
+func walletHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	c, err := siad.WalletGet()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, c)
+}
+
+func consensusHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+	c, err := siad.ConsensusGet()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, c)
+}
+
 func serve(addr string) {
 	mux := httprouter.New()
-	mux.Handler(http.MethodGet, "/", static.BuildUIHandler())
-	mux.POST("/create", createHandler)
-	mux.POST("/accept", acceptHandler)
-	mux.POST("/finish", finishHandler)
+	mux.POST("/api/create", createHandler)
+	mux.POST("/api/accept", acceptHandler)
+	mux.POST("/api/finish", finishHandler)
+	mux.POST("/api/summarize", summarizeHandler)
+	mux.GET("/api/wallet", walletHandler)
+	mux.GET("/api/consensus", consensusHandler)
 
-	// CORS, for development only
+	mux.NotFound = buildUIHandler()
+
 	mux.GlobalOPTIONS = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Access-Control-Request-Method") != "" {
 			w.Header().Set("Access-Control-Allow-Headers", "content-type")
 			w.Header().Set("Access-Control-Allow-Methods", w.Header().Get("Allow"))
+			// CORS, for development only
 			w.Header().Set("Access-Control-Allow-Origin", "*")
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -139,10 +178,10 @@ func serve(addr string) {
 	}()
 	log.Printf("Listening on %v...", addr)
 
-	if err := open(addr); err != nil {
-		log.Println("Warning: failed to automatically open web UI:", err)
-		log.Println("Please navigate to the above URL in your browser.")
-	}
+	// if err := open(addr); err != nil {
+	// 	log.Println("Warning: failed to automatically open web UI:", err)
+	// 	log.Println("Please navigate to the above URL in your browser.")
+	// }
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt)

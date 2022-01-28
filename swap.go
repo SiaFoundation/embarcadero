@@ -26,6 +26,12 @@ type SwapTransaction struct {
 	Signatures     []types.TransactionSignature
 }
 
+type SwapSummary struct {
+	Ours   string `json:"ours"`
+	Theirs string `json:"theirs"`
+	Fee    bool   `json:"fee"`
+}
+
 func (swap *SwapTransaction) Transaction() types.Transaction {
 	return types.Transaction{
 		SiacoinInputs:         swap.SiacoinInputs,
@@ -378,4 +384,29 @@ func FinishSwap(swap *SwapTransaction) error {
 		return err
 	}
 	return siad.TransactionPoolRawPost(swap.Transaction(), nil)
+}
+
+func Summarize(swap SwapTransaction) (SwapSummary, error) {
+	wag, err := siad.WalletAddressesGet()
+	if err != nil {
+		return SwapSummary{}, err
+	}
+	var receiveSC bool
+	for _, addr := range wag.Addresses {
+		if swap.SiacoinOutputs[0].UnlockHash == addr {
+			receiveSC = true
+			break
+		}
+	}
+	ours := swap.SiacoinOutputs[0].Value.HumanString()
+	theirs := swap.SiafundOutputs[0].Value.String() + " SF"
+	if !receiveSC {
+		ours, theirs = theirs, ours
+	}
+
+	return SwapSummary{
+		Ours:   ours,
+		Theirs: theirs,
+		Fee:    !receiveSC,
+	}, nil
 }

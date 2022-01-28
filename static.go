@@ -1,4 +1,4 @@
-package static
+package main
 
 import (
 	"embed"
@@ -9,7 +9,6 @@ import (
 )
 
 var (
-	// FYI: ../ is not allowed in the embed directive, so dist will need to be copied here.
 	//go:embed dist/*
 	Assets   embed.FS
 	buildDir = "dist"
@@ -23,7 +22,7 @@ func (f fsFunc) Open(name string) (fs.File, error) {
 	return f(name)
 }
 
-func BuildUIHandler() http.Handler {
+func buildUIHandler() http.Handler {
 	defaultPath := path.Join(buildDir, "index.html")
 
 	handler := fsFunc(func(name string) (fs.File, error) {

@@ -6,27 +6,15 @@ import (
 	"strings"
 )
 
-func summarize(swap SwapTransaction) error {
-	wag, err := siad.WalletAddressesGet()
+func summarizeCLI(swap SwapTransaction) error {
+	s, err := Summarize(swap)
 	if err != nil {
 		return err
 	}
-	var receiveSC bool
-	for _, addr := range wag.Addresses {
-		if swap.SiacoinOutputs[0].UnlockHash == addr {
-			receiveSC = true
-			break
-		}
-	}
-	ours := swap.SiacoinOutputs[0].Value.HumanString()
-	theirs := swap.SiafundOutputs[0].Value.String() + " SF"
-	if !receiveSC {
-		ours, theirs = theirs, ours
-	}
 	fmt.Println("Swap summary:")
-	fmt.Println("  You receive           ", ours)
-	fmt.Println("  Counterparty receives ", theirs)
-	if !receiveSC {
+	fmt.Println("  You receive           ", s.Ours)
+	fmt.Println("  Counterparty receives ", s.Theirs)
+	if s.Fee {
 		fmt.Println("  You will also pay the 5 SC transaction fee.")
 	}
 	return nil
@@ -54,7 +42,7 @@ func acceptCLI(swapStr string) {
 	if err := CheckAccept(swap); err != nil {
 		log.Fatal(err)
 	}
-	summarize(swap)
+	summarizeCLI(swap)
 	fmt.Print("Accept this swap? [y/n]: ")
 	var resp string
 	fmt.Scanln(&resp)
@@ -81,7 +69,7 @@ func finishCLI(swapStr string) {
 	if err := CheckFinish(swap); err != nil {
 		log.Fatal(err)
 	}
-	summarize(swap)
+	summarizeCLI(swap)
 	fmt.Print("Sign and broadcast this transaction? [y/n]: ")
 	var resp string
 	fmt.Scanln(&resp)
