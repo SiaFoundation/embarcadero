@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"log"
 	"math/big"
 	"strings"
@@ -19,17 +18,28 @@ var siad *client.Client
 var minerFee = types.SiacoinPrecision.Mul64(5)
 
 type SwapTransaction struct {
-	SiacoinInputs  []types.SiacoinInput
-	SiafundInputs  []types.SiafundInput
-	SiacoinOutputs []types.SiacoinOutput
-	SiafundOutputs []types.SiafundOutput
-	Signatures     []types.TransactionSignature
+	SiacoinInputs  []types.SiacoinInput         `json:"siacoinInputs"`
+	SiafundInputs  []types.SiafundInput         `json:"siafundInputs"`
+	SiacoinOutputs []types.SiacoinOutput        `json:"siacoinOutputs"`
+	SiafundOutputs []types.SiafundOutput        `json:"siafundOutputs"`
+	Signatures     []types.TransactionSignature `json:"signatures"`
 }
 
+// type SwapStatus =
+// 	| 'waitingForCounterpartyToAccept'
+// 	| 'waitingForYouToAccept'
+// 	| 'waitingForCounterpartyToFinish'
+// 	| 'waitingForYouToFinish'
+type SwapStatus = string
+
 type SwapSummary struct {
-	Ours   string `json:"ours"`
-	Theirs string `json:"theirs"`
-	Fee    bool   `json:"fee"`
+	ReceiveSF bool           `json:"receiveSF"`
+	ReceiveSC bool           `json:"receiveSC"`
+	PayFee    bool           `json:"payFee"`
+	AmountSF  types.Currency `json:"amountSF"`
+	AmountSC  types.Currency `json:"amountSC"`
+	AmountFee types.Currency `json:"amountFee"`
+	Status    SwapStatus     `json:"status"`
 }
 
 func (swap *SwapTransaction) Transaction() types.Transaction {
@@ -72,26 +82,6 @@ func ParseCurrency(amount string) types.Currency {
 	}
 	log.Fatal("Must specify units of currency")
 	return types.Currency{}
-}
-
-func formatCurrency(c types.Currency) string {
-	pico := types.SiacoinPrecision.Div64(1e12)
-	if c.Cmp(pico) < 0 {
-		return c.String() + " H"
-	}
-	mag := pico
-	unit := ""
-	for _, unit = range []string{"pS", "nS", "uS", "mS", "SC", "KS", "MS", "GS", "TS"} {
-		if c.Cmp(mag.Mul64(1e3)) < 0 {
-			break
-		} else if unit != "TS" {
-			mag = mag.Mul64(1e3)
-		}
-	}
-	num := new(big.Rat).SetInt(c.Big())
-	denom := new(big.Rat).SetInt(mag.Big())
-	res, _ := new(big.Rat).Mul(num, denom.Inv(denom)).Float64()
-	return fmt.Sprintf("%.4g %s", res, unit)
 }
 
 func EncodeSwap(swap SwapTransaction) string {
@@ -391,22 +381,60 @@ func Summarize(swap SwapTransaction) (SwapSummary, error) {
 	if err != nil {
 		return SwapSummary{}, err
 	}
+
 	var receiveSC bool
+	var receiveSF bool
+
 	for _, addr := range wag.Addresses {
 		if swap.SiacoinOutputs[0].UnlockHash == addr {
 			receiveSC = true
 			break
 		}
 	}
-	ours := swap.SiacoinOutputs[0].Value.HumanString()
-	theirs := swap.SiafundOutputs[0].Value.String() + " SF"
-	if !receiveSC {
-		ours, theirs = theirs, ours
+	for _, addr := range wag.Addresses {
+		if swap.SiafundOutputs[0].UnlockHash == addr {
+			receiveSF = true
+			break
+		}
 	}
 
+	var status string
+	if len(swap.Signatures) == 0 {
+		if receiveSC || receiveSF {
+			status = "waitingForCounterpartyToAccept"
+		} else {
+			status = "waitingForYouToAccept"
+		}
+	}
+
+	var receiveSCHasSigned bool
+	var receiveSFHasSigned bool
+
+	if len(swap.Signatures) == 1 {
+		sig := swap.Signatures[0]
+		if sig.ParentID == crypto.Hash(swap.SiacoinInputs[0].ParentID) {
+			receiveSCHasSigned = true
+		}
+		if sig.ParentID == crypto.Hash(swap.SiafundInputs[0].ParentID) {
+			receiveSCHasSigned = true
+		}
+		if (receiveSC && receiveSCHasSigned) || (receiveSF && receiveSFHasSigned) {
+			status = "waitingForCounterpartyToFinish"
+		} else {
+			status = "waitingForYouToFinish"
+		}
+	}
+
+	amountSC := swap.SiacoinOutputs[0].Value
+	amountSF := swap.SiafundOutputs[0].Value
+
 	return SwapSummary{
-		Ours:   ours,
-		Theirs: theirs,
-		Fee:    !receiveSC,
+		ReceiveSF: receiveSF,
+		ReceiveSC: receiveSC,
+		AmountSC:  amountSC,
+		AmountSF:  amountSF,
+		PayFee:    !receiveSC,
+		AmountFee: minerFee,
+		Status:    status,
 	}, nil
 }

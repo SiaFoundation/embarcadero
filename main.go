@@ -56,6 +56,7 @@ func main() {
 	rootCmd.Usage = flagg.SimpleUsage(rootCmd, rootUsage)
 	webAddr := rootCmd.String("addr", "localhost:8080", "HTTP service address")
 	siadAddr := rootCmd.String("siad", "localhost:9980", "host:port that the siad API is running on")
+	dev := rootCmd.Bool("dev", false, "run in dev mode")
 
 	createCmd := flagg.New("create", createUsage)
 	acceptCmd := flagg.New("accept", acceptUsage)
@@ -78,7 +79,7 @@ func main() {
 
 	switch cmd {
 	case rootCmd:
-		serve(*webAddr)
+		serve(*webAddr, *dev)
 	case createCmd:
 		if len(args) != 2 {
 			cmd.Usage()

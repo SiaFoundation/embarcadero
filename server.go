@@ -40,6 +40,7 @@ type createRequest struct {
 
 type createResponse struct {
 	Swap SwapTransaction `json:"transaction"`
+	Hash string          `json:"hash"`
 }
 
 func createHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -60,16 +61,17 @@ func createHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 	}
 	writeJSON(w, createResponse{
 		Swap: swap,
+		Hash: EncodeSwap(swap),
 	})
 }
 
 type acceptRequest struct {
-	Swap SwapTransaction `json:"transaction"`
+	Hash string `json:"hash"`
 }
 
 type acceptResponse struct {
-	ID   string          `json:"id"`
-	Swap SwapTransaction `json:"transaction"`
+	ID   string `json:"id"`
+	Hash string `json:"hash"`
 }
 
 func acceptHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -78,26 +80,32 @@ func acceptHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := CheckAccept(ar.Swap); err != nil {
+	swap, err := DecodeSwap(ar.Hash)
+	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := AcceptSwap(&ar.Swap); err != nil {
+	if err := CheckAccept(swap); err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := AcceptSwap(&swap); err != nil {
 		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, acceptResponse{
-		ID:   ar.Swap.Transaction().ID().String(),
-		Swap: ar.Swap,
+		ID:   swap.Transaction().ID().String(),
+		Hash: EncodeSwap(swap),
 	})
 }
 
 type finishRequest struct {
-	Swap SwapTransaction `json:"transaction"`
+	Hash string `json:"hash"`
 }
 
 type finishResponse struct {
-	ID string `json:"id"`
+	ID   string `json:"id"`
+	Hash string `json:"hash"`
 }
 
 func finishHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -106,21 +114,32 @@ func finishHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := CheckFinish(fr.Swap); err != nil {
+	swap, err := DecodeSwap(fr.Hash)
+	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := FinishSwap(&fr.Swap); err != nil {
+	if err := CheckFinish(swap); err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := FinishSwap(&swap); err != nil {
 		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, finishResponse{
-		ID: fr.Swap.Transaction().ID().String(),
+		ID:   swap.Transaction().ID().String(),
+		Hash: EncodeSwap(swap),
 	})
 }
 
 type summarizeRequest struct {
-	Swap SwapTransaction `json:"transaction"`
+	Hash string `json:"hash"`
+}
+
+type summarizeResponse struct {
+	Summary SwapSummary     `json:"summary"`
+	Swap    SwapTransaction `json:"swap"`
 }
 
 func summarizeHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -129,12 +148,20 @@ func summarizeHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Param
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	s, err := Summarize(fr.Swap)
+	swap, err := DecodeSwap(fr.Hash)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	writeJSON(w, s)
+	summary, err := Summarize(swap)
+	if err != nil {
+		writeError(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	writeJSON(w, summarizeResponse{
+		Summary: summary,
+		Swap:    swap,
+	})
 }
 
 func walletHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -155,7 +182,7 @@ func consensusHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Param
 	writeJSON(w, c)
 }
 
-func serve(addr string) {
+func serve(addr string, dev bool) {
 	mux := httprouter.New()
 	mux.POST("/api/create", createHandler)
 	mux.POST("/api/accept", acceptHandler)
@@ -170,8 +197,10 @@ func serve(addr string) {
 		if r.Header.Get("Access-Control-Request-Method") != "" {
 			w.Header().Set("Access-Control-Allow-Headers", "content-type")
 			w.Header().Set("Access-Control-Allow-Methods", w.Header().Get("Allow"))
-			// CORS, for development only
-			w.Header().Set("Access-Control-Allow-Origin", "*")
+			// CORS, necessary for development only
+			if dev {
+				w.Header().Set("Access-Control-Allow-Origin", "*")
+			}
 		}
 		w.WriteHeader(http.StatusNoContent)
 	})
@@ -183,10 +212,12 @@ func serve(addr string) {
 	}()
 	log.Printf("Listening on %v...", addr)
 
-	// if err := open(addr); err != nil {
-	// 	log.Println("Warning: failed to automatically open web UI:", err)
-	// 	log.Println("Please navigate to the above URL in your browser.")
-	// }
+	if !dev {
+		if err := open(addr); err != nil {
+			log.Println("Warning: failed to automatically open web UI:", err)
+			log.Println("Please navigate to the above URL in your browser.")
+		}
+	}
 
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt)

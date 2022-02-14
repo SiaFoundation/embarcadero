@@ -12,9 +12,16 @@ func summarizeCLI(swap SwapTransaction) error {
 		return err
 	}
 	fmt.Println("Swap summary:")
-	fmt.Println("  You receive           ", s.Ours)
-	fmt.Println("  Counterparty receives ", s.Theirs)
-	if s.Fee {
+
+	ours, theirs := s.AmountSC.HumanString(), s.AmountSF.String()
+
+	if s.ReceiveSF {
+		theirs, ours = ours, theirs
+	}
+
+	fmt.Println("  You receive           ", ours)
+	fmt.Println("  Counterparty receives ", theirs)
+	if s.PayFee {
 		fmt.Println("  You will also pay the 5 SC transaction fee.")
 	}
 	return nil
