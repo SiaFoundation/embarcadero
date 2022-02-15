@@ -11,14 +11,12 @@ func summarizeCLI(swap SwapTransaction) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("Swap summary:")
-
 	ours, theirs := s.AmountSC.HumanString(), s.AmountSF.String()
-
 	if s.ReceiveSF {
 		theirs, ours = ours, theirs
 	}
 
+	fmt.Println("Swap summary:")
 	fmt.Println("  You receive           ", ours)
 	fmt.Println("  Counterparty receives ", theirs)
 	if s.PayFee {

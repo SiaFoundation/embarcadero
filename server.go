@@ -40,7 +40,7 @@ type createRequest struct {
 
 type createResponse struct {
 	Swap SwapTransaction `json:"transaction"`
-	Hash string          `json:"hash"`
+	Raw  string          `json:"raw"`
 }
 
 func createHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -61,17 +61,17 @@ func createHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 	}
 	writeJSON(w, createResponse{
 		Swap: swap,
-		Hash: EncodeSwap(swap),
+		Raw:  EncodeSwap(swap),
 	})
 }
 
 type acceptRequest struct {
-	Hash string `json:"hash"`
+	Raw string `json:"raw"`
 }
 
 type acceptResponse struct {
-	ID   string `json:"id"`
-	Hash string `json:"hash"`
+	ID  string `json:"id"`
+	Raw string `json:"raw"`
 }
 
 func acceptHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -80,7 +80,7 @@ func acceptHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	swap, err := DecodeSwap(ar.Hash)
+	swap, err := DecodeSwap(ar.Raw)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
@@ -94,18 +94,18 @@ func acceptHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 		return
 	}
 	writeJSON(w, acceptResponse{
-		ID:   swap.Transaction().ID().String(),
-		Hash: EncodeSwap(swap),
+		ID:  swap.Transaction().ID().String(),
+		Raw: EncodeSwap(swap),
 	})
 }
 
 type finishRequest struct {
-	Hash string `json:"hash"`
+	Raw string `json:"raw"`
 }
 
 type finishResponse struct {
-	ID   string `json:"id"`
-	Hash string `json:"hash"`
+	ID  string `json:"id"`
+	Raw string `json:"raw"`
 }
 
 func finishHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -114,7 +114,7 @@ func finishHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	swap, err := DecodeSwap(fr.Hash)
+	swap, err := DecodeSwap(fr.Raw)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
@@ -128,13 +128,13 @@ func finishHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 		return
 	}
 	writeJSON(w, finishResponse{
-		ID:   swap.Transaction().ID().String(),
-		Hash: EncodeSwap(swap),
+		ID:  swap.Transaction().ID().String(),
+		Raw: EncodeSwap(swap),
 	})
 }
 
 type summarizeRequest struct {
-	Hash string `json:"hash"`
+	Raw string `json:"raw"`
 }
 
 type summarizeResponse struct {
@@ -148,7 +148,7 @@ func summarizeHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Param
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	swap, err := DecodeSwap(fr.Hash)
+	swap, err := DecodeSwap(fr.Raw)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
@@ -183,30 +183,35 @@ func consensusHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Param
 }
 
 func serve(addr string, dev bool) {
-	mux := httprouter.New()
-	mux.POST("/api/create", createHandler)
-	mux.POST("/api/accept", acceptHandler)
-	mux.POST("/api/finish", finishHandler)
-	mux.POST("/api/summarize", summarizeHandler)
-	mux.GET("/api/wallet", walletHandler)
-	mux.GET("/api/consensus", consensusHandler)
-
-	mux.NotFound = buildUIHandler()
-
-	mux.GlobalOPTIONS = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Access-Control-Request-Method") != "" {
-			w.Header().Set("Access-Control-Allow-Headers", "content-type")
-			w.Header().Set("Access-Control-Allow-Methods", w.Header().Get("Allow"))
-			// CORS, necessary for development only
-			if dev {
-				w.Header().Set("Access-Control-Allow-Origin", "*")
-			}
-		}
-		w.WriteHeader(http.StatusNoContent)
-	})
+	api := httprouter.New()
+	api.POST("/api/create", createHandler)
+	api.POST("/api/accept", acceptHandler)
+	api.POST("/api/finish", finishHandler)
+	api.POST("/api/summarize", summarizeHandler)
+	api.GET("/api/wallet", walletHandler)
+	api.GET("/api/consensus", consensusHandler)
 
 	go func() {
-		if err := http.ListenAndServe(addr, mux); err != nil && err != http.ErrServerClosed {
+		ui := buildUIHandler()
+		err := http.ListenAndServe(addr, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodOptions {
+				if r.Header.Get("Access-Control-Request-Method") != "" {
+					w.Header().Set("Access-Control-Allow-Headers", "content-type")
+					w.Header().Set("Access-Control-Allow-Methods", w.Header().Get("Allow"))
+					// CORS, necessary for development only
+					if dev {
+						w.Header().Set("Access-Control-Allow-Origin", "*")
+					}
+				}
+				w.WriteHeader(http.StatusNoContent)
+				return
+			} else if strings.HasPrefix(r.URL.Path, "/api") {
+				api.ServeHTTP(w, r)
+				return
+			}
+			ui.ServeHTTP(w, r)
+		}))
+		if err != nil && err != http.ErrServerClosed {
 			log.Fatal(err)
 		}
 	}()
