@@ -25,21 +25,13 @@ type SwapTransaction struct {
 	Signatures     []types.TransactionSignature `json:"signatures"`
 }
 
-// type SwapStatus =
-// 	| 'waitingForCounterpartyToAccept'
-// 	| 'waitingForYouToAccept'
-// 	| 'waitingForCounterpartyToFinish'
-// 	| 'waitingForYouToFinish'
-type SwapStatus = string
-
 type SwapSummary struct {
 	ReceiveSF bool           `json:"receiveSF"`
 	ReceiveSC bool           `json:"receiveSC"`
-	PayFee    bool           `json:"payFee"`
 	AmountSF  types.Currency `json:"amountSF"`
 	AmountSC  types.Currency `json:"amountSC"`
-	AmountFee types.Currency `json:"amountFee"`
-	Status    SwapStatus     `json:"status"`
+	MinerFee  types.Currency `json:"minerFee"`
+	Stage     int            `json:"stage"`
 }
 
 func (swap *SwapTransaction) Transaction() types.Transaction {
@@ -376,65 +368,33 @@ func FinishSwap(swap *SwapTransaction) error {
 	return siad.TransactionPoolRawPost(swap.Transaction(), nil)
 }
 
-func Summarize(swap SwapTransaction) (SwapSummary, error) {
+func Summarize(swap SwapTransaction) (s SwapSummary, err error) {
 	wag, err := siad.WalletAddressesGet()
 	if err != nil {
 		return SwapSummary{}, err
 	}
 
-	var receiveSC bool
-	var receiveSF bool
-
 	for _, addr := range wag.Addresses {
-		if swap.SiacoinOutputs[0].UnlockHash == addr {
-			receiveSC = true
+		s.ReceiveSC = swap.SiacoinOutputs[0].UnlockHash == addr
+		s.ReceiveSF = swap.SiafundOutputs[0].UnlockHash == addr
+		if s.ReceiveSC || s.ReceiveSF {
 			break
 		}
 	}
-	for _, addr := range wag.Addresses {
-		if swap.SiafundOutputs[0].UnlockHash == addr {
-			receiveSF = true
-			break
+	s.AmountSC = swap.SiacoinOutputs[0].Value
+	s.AmountSF = swap.SiafundOutputs[0].Value
+	s.MinerFee = minerFee
+	s.Stage = 0
+	if s.ReceiveSC || s.ReceiveSF {
+		s.Stage++
+		if len(swap.Signatures) > 0 {
+			s.Stage++
+			receiveSCHasSigned := swap.Signatures[0].ParentID == crypto.Hash(swap.SiacoinInputs[0].ParentID)
+			receiveSFHasSigned := swap.Signatures[0].ParentID == crypto.Hash(swap.SiafundInputs[0].ParentID)
+			if (s.ReceiveSC && receiveSCHasSigned) || (s.ReceiveSF && receiveSFHasSigned) {
+				s.Stage++
+			}
 		}
 	}
-
-	var status string
-	if len(swap.Signatures) == 0 {
-		if receiveSC || receiveSF {
-			status = "waitingForCounterpartyToAccept"
-		} else {
-			status = "waitingForYouToAccept"
-		}
-	}
-
-	var receiveSCHasSigned bool
-	var receiveSFHasSigned bool
-
-	if len(swap.Signatures) == 1 {
-		sig := swap.Signatures[0]
-		if sig.ParentID == crypto.Hash(swap.SiacoinInputs[0].ParentID) {
-			receiveSCHasSigned = true
-		}
-		if sig.ParentID == crypto.Hash(swap.SiafundInputs[0].ParentID) {
-			receiveSCHasSigned = true
-		}
-		if (receiveSC && receiveSCHasSigned) || (receiveSF && receiveSFHasSigned) {
-			status = "waitingForCounterpartyToFinish"
-		} else {
-			status = "waitingForYouToFinish"
-		}
-	}
-
-	amountSC := swap.SiacoinOutputs[0].Value
-	amountSF := swap.SiafundOutputs[0].Value
-
-	return SwapSummary{
-		ReceiveSF: receiveSF,
-		ReceiveSC: receiveSC,
-		AmountSC:  amountSC,
-		AmountSF:  amountSF,
-		PayFee:    !receiveSC,
-		AmountFee: minerFee,
-		Status:    status,
-	}, nil
+	return
 }
