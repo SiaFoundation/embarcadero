@@ -17,6 +17,8 @@ runs:
         fetch-depth: 0
     - name: Set NX SHAs
       uses: nrwl/nx-set-shas@v2
+      with:
+        main-branch-name: "master"
     - name: Set up Node
       uses: actions/setup-node@v2
       with:
