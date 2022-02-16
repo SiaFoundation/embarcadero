@@ -18,7 +18,7 @@ runs:
     - name: Set NX SHAs
       uses: nrwl/nx-set-shas@v2
     - name: Set up Node
-    - uses: actions/setup-node@v2
+      uses: actions/setup-node@v2
       with:
         node-version: ${{ inputs.node_version }}
         registry-url: https://registry.npmjs.org
