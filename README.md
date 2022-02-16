@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/SiaFoundation/embarcadero/master/assets/image.png" alt="Embarcadero" width="100%" />
+<img src="./assets/image.png" alt="Embarcadero" width="100%" />
 
 ---
 
