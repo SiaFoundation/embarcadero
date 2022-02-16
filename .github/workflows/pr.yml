@@ -9,9 +9,6 @@ jobs:
       matrix:
         node_version: [16]
     if: ${{ github.event_name == 'pull_request' }}
-    defaults:
-      run:
-        working-directory: ./app
     steps:
       - uses: actions/checkout@v2
       - name: Setup

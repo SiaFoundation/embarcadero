@@ -27,3 +27,4 @@ runs:
     - name: Install
       shell: bash
       run: npm install
+      working-directory: ./app
