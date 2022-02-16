@@ -9,9 +9,9 @@ import (
 )
 
 var (
-	//go:embed dist/*
+	//go:embed app/dist/apps/embarcadero
 	Assets   embed.FS
-	buildDir = "dist"
+	buildDir = "app/dist/apps/embarcadero"
 )
 
 // Static file server for UI
