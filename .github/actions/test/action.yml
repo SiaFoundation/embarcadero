@@ -1,19 +1,35 @@
 name: Test
-
-description: Test
+description: Lints and tests embarcardero
 
 runs:
   using: composite
   steps:
-    - name: Lint
+    - name: Lint web
       shell: bash
       run: npx nx affected --target=lint --parallel --max-parallel=3
       working-directory: ./app
-    - name: Build
+    - name: Build web
       shell: bash
       run: npx nx affected --target=build --parallel --max-parallel=3
       working-directory: ./app
-    - name: Test
+    - name: Test web
       shell: bash
       run: npx nx affected --target=test --parallel --max-parallel=2
       working-directory: ./app
+    - name: Build web dist # required for Go steps to succeed
+      shell: bash
+      run: npx nx build
+      working-directory: ./app
+    - name: Lint Go
+      uses: golangci/golangci-lint-action@v2
+      with:
+        skip-go-installation: true
+    - name: Test Go
+      uses: n8maninger/action-golang-test@v1
+      with:
+        args: "-race"
+        skip-go-install: true
+        show-package-output: true
+    - name: Build Go
+      shell: bash
+      run: go build -o dist/ .
