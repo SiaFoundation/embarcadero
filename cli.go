@@ -51,11 +51,9 @@ func acceptCLI(swapStr string) {
 	fmt.Print("Accept this swap? [y/n]: ")
 	var resp string
 	fmt.Scanln(&resp)
-	if strings.ToLower(resp) != "y" {
+	if !strings.EqualFold(resp, "y") {
 		log.Fatal("Swap cancelled.")
-	}
-	err = AcceptSwap(&swap)
-	if err != nil {
+	} else if err = AcceptSwap(&swap); err != nil {
 		log.Fatal(err)
 	}
 	fmt.Println("Swap accepted!")
@@ -78,10 +76,9 @@ func finishCLI(swapStr string) {
 	fmt.Print("Sign and broadcast this transaction? [y/n]: ")
 	var resp string
 	fmt.Scanln(&resp)
-	if strings.ToLower(resp) != "y" {
+	if !strings.EqualFold(resp, "y") {
 		log.Fatal("Swap cancelled.")
-	}
-	if err := FinishSwap(&swap); err != nil {
+	} else if err := FinishSwap(&swap); err != nil {
 		log.Fatal(err)
 	}
 	fmt.Println("Successfully broadcast swap transaction!")

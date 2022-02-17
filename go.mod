@@ -3,6 +3,7 @@ module go.sia.tech/embarcadero
 go 1.17
 
 require (
+	github.com/OneOfOne/struct2ts v1.0.6
 	github.com/julienschmidt/httprouter v1.3.0
 	gitlab.com/NebulousLabs/encoding v0.0.0-20200604091946-456c3dc907fe
 	go.sia.tech/siad v1.5.7

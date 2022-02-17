@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/base64"
 	"errors"
+	"fmt"
 	"log"
 	"math/big"
 	"strings"
@@ -17,6 +18,8 @@ var siad *client.Client
 
 var minerFee = types.SiacoinPrecision.Mul64(5)
 
+// A SwapTransaction is a transaction that swaps Siacoin for Siafunds between
+// two parties.
 type SwapTransaction struct {
 	SiacoinInputs  []types.SiacoinInput         `json:"siacoinInputs"`
 	SiafundInputs  []types.SiafundInput         `json:"siafundInputs"`
@@ -25,6 +28,8 @@ type SwapTransaction struct {
 	Signatures     []types.TransactionSignature `json:"signatures"`
 }
 
+// A SwapSummary details the amount of Siacoins and Siafunds received and spent
+// by a party during a swap.
 type SwapSummary struct {
 	ReceiveSF bool           `json:"receiveSF"`
 	ReceiveSC bool           `json:"receiveSC"`
@@ -34,6 +39,7 @@ type SwapSummary struct {
 	Stage     int            `json:"stage"`
 }
 
+// Transaction converts the swap transaction into a full transaction.
 func (swap *SwapTransaction) Transaction() types.Transaction {
 	return types.Transaction{
 		SiacoinInputs:         swap.SiacoinInputs,
@@ -45,6 +51,8 @@ func (swap *SwapTransaction) Transaction() types.Transaction {
 	}
 }
 
+// ParseCurrency parses a suffixed Siacoin or Siafund string into a currency
+// value.
 func ParseCurrency(amount string) types.Currency {
 	amount = strings.TrimSpace(amount)
 	if strings.HasSuffix(amount, "SF") || strings.HasSuffix(amount, "H") {
@@ -76,14 +84,16 @@ func ParseCurrency(amount string) types.Currency {
 	return types.Currency{}
 }
 
+// EncodeSwap encodes the swap transaction into a base64 string.
 func EncodeSwap(swap SwapTransaction) string {
 	return base64.StdEncoding.EncodeToString(encoding.Marshal(swap))
 }
 
+// DecodeSwap decodes a base64 encoded swap transaction.
 func DecodeSwap(s string) (SwapTransaction, error) {
 	data, err := base64.StdEncoding.DecodeString(s)
 	if err != nil {
-		return SwapTransaction{}, err
+		return SwapTransaction{}, fmt.Errorf("failed to decode base64: %w", err)
 	}
 	var swap SwapTransaction
 	err = encoding.Unmarshal(data, &swap)
@@ -93,14 +103,14 @@ func DecodeSwap(s string) (SwapTransaction, error) {
 func addSC(swap *SwapTransaction, amount types.Currency) error {
 	wug, err := siad.WalletUnspentGet()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get unspent outputs: %w", err)
 	}
 	var inputSum types.Currency
 	for _, u := range wug.Outputs {
 		if u.FundType == types.SpecifierSiacoinOutput {
 			wucg, err := siad.WalletUnlockConditionsGet(u.UnlockHash)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to get address %v unlock conditions: %w", u.UnlockHash, err)
 			}
 			swap.SiacoinInputs = append(swap.SiacoinInputs, types.SiacoinInput{
 				ParentID:         types.SiacoinOutputID(u.ID),
@@ -119,7 +129,7 @@ func addSC(swap *SwapTransaction, amount types.Currency) error {
 	if !inputSum.Equals(amount) {
 		wag, err := siad.WalletAddressGet()
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to get change output address: %w", err)
 		}
 		swap.SiacoinOutputs = append(swap.SiacoinOutputs, types.SiacoinOutput{
 			UnlockHash: wag.Address,
@@ -132,18 +142,18 @@ func addSC(swap *SwapTransaction, amount types.Currency) error {
 func addSF(swap *SwapTransaction, amount types.Currency) error {
 	wug, err := siad.WalletUnspentGet()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get wallet unspent outputs: %w", err)
 	}
 	wag, err := siad.WalletAddressGet()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get wallet address: %w", err)
 	}
 	var inputSum types.Currency
 	for _, u := range wug.Outputs {
 		if u.FundType == types.SpecifierSiafundOutput {
 			wucg, err := siad.WalletUnlockConditionsGet(u.UnlockHash)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to get address %v unlock conditions: %w", u.UnlockHash, err)
 			}
 			swap.SiafundInputs = append(swap.SiafundInputs, types.SiafundInput{
 				ParentID:         types.SiafundOutputID(u.ID),
@@ -201,6 +211,8 @@ func signSF(swap *SwapTransaction) error {
 	return err
 }
 
+// CreateSwap creates a new SwapTransaction swapping the input amount for the
+// output amount.
 func CreateSwap(inputAmount, outputAmount types.Currency, offeringSF bool) (SwapTransaction, error) {
 	wag, err := siad.WalletAddressGet()
 	if err != nil {
@@ -217,7 +229,7 @@ func CreateSwap(inputAmount, outputAmount types.Currency, offeringSF bool) (Swap
 			UnlockHash: types.UnlockHash{}, // to be filled in by counterparty
 		})
 		if err := addSF(&swap, inputAmount); err != nil {
-			return SwapTransaction{}, err
+			return SwapTransaction{}, fmt.Errorf("failed to add siafunds to swap transaction: %w", err)
 		}
 	} else {
 		swap.SiacoinOutputs = append(swap.SiacoinOutputs, types.SiacoinOutput{
@@ -230,12 +242,13 @@ func CreateSwap(inputAmount, outputAmount types.Currency, offeringSF bool) (Swap
 		})
 		// the party that contributes SC is responsible for paying the miner fee
 		if err := addSC(&swap, inputAmount.Add(minerFee)); err != nil {
-			return SwapTransaction{}, err
+			return SwapTransaction{}, fmt.Errorf("failed to add siacoins to swap transaction: %w", err)
 		}
 	}
 	return swap, nil
 }
 
+// CheckAccept checks that the counterparty's swap transaction is valid
 func CheckAccept(swap SwapTransaction) error {
 	if len(swap.SiacoinInputs) == 0 && len(swap.SiafundInputs) == 0 {
 		return errors.New("transaction has no inputs")
@@ -251,26 +264,26 @@ func CheckAccept(swap SwapTransaction) error {
 	return nil
 }
 
+// AcceptSwap accepts and signs a swap transaction.
 func AcceptSwap(swap *SwapTransaction) error {
 	wag, err := siad.WalletAddressGet()
 	if err != nil {
-		return err
-	}
-	if len(swap.SiacoinInputs) == 0 {
+		return fmt.Errorf("failed to get wallet address: %w", err)
+	} else if len(swap.SiacoinInputs) == 0 {
 		swap.SiafundOutputs[0].UnlockHash = wag.Address
 		if err := addSC(swap, swap.SiacoinOutputs[0].Value.Add(minerFee)); err != nil {
-			return err
+			return fmt.Errorf("failed to add siacoin inputs: %w", err)
 		}
 		return signSC(swap)
-	} else {
-		swap.SiacoinOutputs[0].UnlockHash = wag.Address
-		if err := addSF(swap, swap.SiafundOutputs[0].Value); err != nil {
-			return err
-		}
-		return signSF(swap)
 	}
+	swap.SiacoinOutputs[0].UnlockHash = wag.Address
+	if err := addSF(swap, swap.SiafundOutputs[0].Value); err != nil {
+		return fmt.Errorf("failed to add siafund inputs: %w", err)
+	}
+	return signSF(swap)
 }
 
+// CheckFinish checks that the accepted swap transaction is valid
 func CheckFinish(swap SwapTransaction) error {
 	if len(swap.SiacoinInputs) == 0 || len(swap.SiafundInputs) == 0 {
 		return errors.New("transaction is missing inputs")
@@ -284,7 +297,7 @@ func CheckFinish(swap SwapTransaction) error {
 
 	wag, err := siad.WalletAddressesGet()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get wallet addresses: %w", err)
 	}
 	belongsToUs := make(map[types.UnlockHash]bool)
 	for _, addr := range wag.Addresses {
@@ -348,6 +361,7 @@ func CheckFinish(swap SwapTransaction) error {
 	return nil
 }
 
+// FinishSwap signs and broadcasts an accepted swap transaction.
 func FinishSwap(swap *SwapTransaction) error {
 	var haveSCSignatures bool
 	for _, sci := range swap.SiacoinInputs {
@@ -363,15 +377,16 @@ func FinishSwap(swap *SwapTransaction) error {
 		err = signSC(swap)
 	}
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to sign swap transaction: %w", err)
 	}
 	return siad.TransactionPoolRawPost(swap.Transaction(), nil)
 }
 
+// Summarize returns a summary of the swap.
 func Summarize(swap SwapTransaction) (s SwapSummary, err error) {
 	wag, err := siad.WalletAddressesGet()
 	if err != nil {
-		return SwapSummary{}, err
+		return SwapSummary{}, fmt.Errorf("failed to get wallet addresses: %w", err)
 	}
 
 	for _, addr := range wag.Addresses {
