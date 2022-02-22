@@ -7,6 +7,10 @@ inputs:
     description: Node.js version
     required: false
     default: "16"
+  go-version:
+    description: Go version
+    required: false
+    default: "1.17"
 
 runs:
   using: composite
@@ -24,6 +28,10 @@ runs:
       with:
         node-version: ${{ inputs.node_version }}
         registry-url: https://registry.npmjs.org
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ inputs.go-version }}
     - name: Install
       shell: bash
       run: npm install

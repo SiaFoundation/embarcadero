@@ -10,7 +10,7 @@ import (
 
 var (
 	//go:embed app/dist/apps/embarcadero
-	Assets   embed.FS
+	assets   embed.FS
 	buildDir = "app/dist/apps/embarcadero"
 )
 
@@ -27,11 +27,11 @@ func buildUIHandler() http.Handler {
 
 	handler := fsFunc(func(name string) (fs.File, error) {
 		assetPath := path.Join(buildDir, name)
-		f, err := Assets.Open(assetPath)
+		f, err := assets.Open(assetPath)
 
 		if os.IsNotExist(err) {
 			// Fallback to index.html
-			return Assets.Open(defaultPath)
+			return assets.Open(defaultPath)
 		}
 
 		return f, err
