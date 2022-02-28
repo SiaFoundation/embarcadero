@@ -1,7 +1,13 @@
 import { Flex, Paragraph, RLink } from '@siafoundation/design-system'
+import { useEffect } from 'react'
+import { useSwap } from '../hooks/useSwap'
 import { routes } from '../routes'
 
 export function Home() {
+  const { clearTransaction } = useSwap()
+  useEffect(() => {
+    clearTransaction()
+  }, [])
   return (
     <Flex direction="column" gap="4">
       <Paragraph>

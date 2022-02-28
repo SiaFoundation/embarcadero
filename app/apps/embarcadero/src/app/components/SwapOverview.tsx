@@ -3,12 +3,8 @@ import { Box, Flex } from '@siafoundation/design-system'
 import { Input } from './Input'
 import { useSwap } from '../hooks/useSwap'
 
-type Props = {
-  hash: string
-}
-
-export function SwapOverview({ hash }: Props) {
-  const { offerSc, sc, sf } = useSwap(hash)
+export function SwapOverview() {
+  const { offerSc, sc, sf } = useSwap()
 
   return (
     <Flex direction="column" align="center" css={{ width: '100%' }}>

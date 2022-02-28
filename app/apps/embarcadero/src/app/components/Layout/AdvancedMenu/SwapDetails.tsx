@@ -1,10 +1,8 @@
 import { Codeblock, Text } from '@siafoundation/design-system'
-import { usePathParams } from '../../../hooks/useHashParam'
 import { useSwap } from '../../../hooks/useSwap'
 
 export function SwapDetails() {
-  const { hash } = usePathParams()
-  const { summary } = useSwap(hash)
+  const { summary } = useSwap()
 
   if (!summary) {
     return (
