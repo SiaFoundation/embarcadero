@@ -1,7 +1,7 @@
 import { Box, Flex, Heading, ProgressBar } from '@siafoundation/design-system'
 import { capitalize, kebabCase } from 'lodash'
-import { usePathParams } from '../../hooks/useHashParam'
-import { SwapStatus, useSwap } from '../../hooks/useSwap'
+import { useSwap } from '../../hooks/useSwap'
+import { SwapStatus } from '../../lib/swapStatus'
 
 const stepMap = {
   creatingANewSwap: 0,
@@ -13,8 +13,7 @@ const stepMap = {
 } as Record<SwapStatus, number>
 
 export function SwapProgress() {
-  const { hash } = usePathParams()
-  const { status } = useSwap(hash)
+  const { status } = useSwap()
 
   const step = status && stepMap[status]
 

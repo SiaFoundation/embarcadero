@@ -6,19 +6,22 @@ import { CreateSwap } from './pages/CreateSwap'
 import { InputSwap } from './pages/InputSwap'
 import { StepSwap } from './pages/StepSwap'
 import { routes } from './routes'
+import { SwapProvider } from './hooks/useSwap'
 
 export function App() {
   return (
     <ThemeProvider>
-      <Layout>
-        <Switch>
-          <Route path={routes.home} exact component={Home} />
-          <Route path={routes.create} component={CreateSwap} />
-          <Route path={routes.input} component={InputSwap} />
-          <Route path={routes.step} component={StepSwap} />
-          <Redirect from="*" to="/" />
-        </Switch>
-      </Layout>
+      <SwapProvider>
+        <Layout>
+          <Switch>
+            <Route path={routes.home} exact component={Home} />
+            <Route path={routes.create} component={CreateSwap} />
+            <Route path={routes.input} component={InputSwap} />
+            <Route path={routes.step} component={StepSwap} />
+            <Redirect from="*" to="/" />
+          </Switch>
+        </Layout>
+      </SwapProvider>
     </ThemeProvider>
   )
 }

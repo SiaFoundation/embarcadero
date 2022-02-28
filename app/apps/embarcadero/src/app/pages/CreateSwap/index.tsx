@@ -4,14 +4,14 @@ import {
   Button,
   Flex,
   triggerErrorToast,
-  triggerToast,
 } from '@siafoundation/design-system'
 import axios from 'axios'
-import { useCallback, useMemo, useState } from 'react'
-import { useHistory, useParams } from 'react-router-dom'
+import { useCallback, useState } from 'react'
+import { useHistory } from 'react-router-dom'
 import { Input } from '../../components/Input'
 import { Message } from '../../components/Message'
 import { Connectivity, useConnectivity } from '../../hooks/useConnectivity'
+import { useSwap } from '../../hooks/useSwap'
 import { routes } from '../../routes'
 
 type Direction = 'SCtoSF' | 'SFtoSC'
@@ -19,11 +19,8 @@ type Direction = 'SCtoSF' | 'SFtoSC'
 export function CreateSwap() {
   const history = useHistory()
   const connectivity = useConnectivity()
-  const { hash: encodedHash } = useParams<{ hash?: string }>()
-  const hash = useMemo(
-    () => (encodedHash ? decodeURIComponent(encodedHash) : undefined),
-    [encodedHash]
-  )
+  const { transaction, setTransaction } = useSwap()
+
   const [direction, setDirection] = useState<Direction>('SCtoSF')
   const [sc, setSc] = useState<string>()
   const [sf, setSf] = useState<string>()
@@ -48,19 +45,18 @@ export function CreateSwap() {
             },
           })
 
-          history.push(
-            routes.step.replace(':raw', encodeURIComponent(response.data.raw))
-          )
+          setTransaction(response.data.raw)
+          history.push(routes.step)
         } catch (e) {
           if (e instanceof Error) {
             console.log(e.message)
           }
-          triggerErrorToast('Error creating swap')
+          triggerErrorToast('Error creating swap transaction')
         }
       }
       func()
     },
-    [offerSc, history]
+    [offerSc, history, setTransaction]
   )
 
   const isValues = sc && sf
@@ -73,7 +69,7 @@ export function CreateSwap() {
           <Input
             currency="SC"
             type="decimal"
-            disabled={!!hash}
+            disabled={!!transaction}
             value={sc}
             onChange={setSc}
             isOffer={offerSc}
@@ -83,7 +79,7 @@ export function CreateSwap() {
           <Input
             currency="SF"
             type="integer"
-            disabled={!!hash}
+            disabled={!!transaction}
             value={sf}
             onChange={setSf}
             isOffer={!offerSc}
@@ -92,7 +88,7 @@ export function CreateSwap() {
         <Box css={{ height: '$2', zIndex: '$1', order: 2 }}>
           <Box
             onClick={() => {
-              if (hash) {
+              if (transaction) {
                 return
               }
               setDirection(direction === 'SCtoSF' ? 'SFtoSC' : 'SCtoSF')
@@ -120,7 +116,7 @@ export function CreateSwap() {
                 height: '30px',
                 width: '30px',
                 transition: 'background 0.1s linear',
-                '&:hover': !hash && {
+                '&:hover': !transaction && {
                   backgroundColor: '$siaGreenA10',
                 },
               }}

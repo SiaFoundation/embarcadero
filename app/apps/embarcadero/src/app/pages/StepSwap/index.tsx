@@ -1,58 +1,22 @@
 import { Button, Flex } from '@siafoundation/design-system'
 import { SwapOverview } from '../../components/SwapOverview'
 import { useSwap } from '../../hooks/useSwap'
-import { usePathParams } from '../../hooks/useHashParam'
 import { Redirect, useHistory } from 'react-router-dom'
 import { Fragment, useCallback, useState } from 'react'
 import axios from 'axios'
-import { routes } from '../../routes'
 import { Message } from '../../components/Message'
 import { Share } from './Share'
-import { handleResponse } from '../../hooks/handleResponse'
 
 export function StepSwap() {
-  const { hash } = usePathParams()
+  const { raw, status, signTransaction, transactionError } = useSwap()
 
-  const { status } = useSwap(hash)
-
-  const history = useHistory()
-  const [error, setError] = useState<string>()
-  const handleMethod = useCallback(
-    (method: 'accept' | 'finish') => {
-      const func = async () => {
-        try {
-          const response = await axios({
-            method: 'post',
-            url: `http://localhost:8080/api/${method}`,
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            data: {
-              raw: hash,
-            },
-          })
-          history.push(
-            routes.step.replace(':raw', encodeURIComponent(response.data.raw))
-          )
-        } catch (e) {
-          if (e instanceof Error) {
-            console.log(e.name, e.message)
-            setError(e.message)
-          }
-        }
-      }
-      func()
-    },
-    [hash, history, setError]
-  )
-
-  if (!hash) {
+  if (!raw) {
     return <Redirect to="/" />
   }
 
   return (
     <Flex direction="column" align="center" gap="3">
-      <SwapOverview hash={hash} />
+      <SwapOverview />
       <Flex
         direction="column"
         align="center"
@@ -70,13 +34,13 @@ export function StepSwap() {
               size="3"
               variant="green"
               css={{ width: '100%' }}
-              onClick={() => handleMethod('accept')}
+              onClick={() => signTransaction('accept')}
             >
               Accept and sign transaction
             </Button>
           </Fragment>
         )}
-        {status === 'waitingForCounterpartyToAccept' && <Share hash={hash} />}
+        {status === 'waitingForCounterpartyToAccept' && <Share />}
         {status === 'waitingForYouToFinish' && (
           <Fragment>
             <Message
@@ -84,20 +48,20 @@ export function StepSwap() {
               Accept and sign the transaction to continue. After this, the counterparty can complete the transaction.
             `}
             />
-            {error && (
+            {transactionError && (
               <Message variant="red" message={'Error completing transaction'} />
             )}
             <Button
               size="3"
               variant="green"
               css={{ width: '100%' }}
-              onClick={() => handleMethod('finish')}
+              onClick={() => signTransaction('finish')}
             >
               Finish and broadcast transaction
             </Button>
           </Fragment>
         )}
-        {status === 'waitingForCounterpartyToFinish' && <Share hash={hash} />}
+        {status === 'waitingForCounterpartyToFinish' && <Share />}
       </Flex>
     </Flex>
   )

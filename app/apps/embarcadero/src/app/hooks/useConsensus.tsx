@@ -1,7 +1,7 @@
 import useSWR from 'swr'
 import { getApi } from '../../config'
 import { ConsensusGET } from '@siafoundation/sia-js'
-import { handleResponse } from './handleResponse'
+import { handleResponse } from '../lib/handleResponse'
 
 export function useConsensus() {
   return useSWR<ConsensusGET>(

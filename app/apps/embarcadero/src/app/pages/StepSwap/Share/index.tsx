@@ -1,59 +1,30 @@
-import { ArrowRightIcon, ClipboardIcon } from '@radix-ui/react-icons'
-import {
-  Box,
-  Button,
-  copyToClipboard,
-  RLinkButton,
-  TextArea,
-  Tooltip,
-} from '@siafoundation/design-system'
+import { ArrowRightIcon, DownloadIcon } from '@radix-ui/react-icons'
+import { Box, Button, RLinkButton } from '@siafoundation/design-system'
 import { Fragment } from 'react'
 import { Message } from '../../../components/Message'
+import { useSwap } from '../../../hooks/useSwap'
 import { routes } from '../../../routes'
 
-type Props = {
-  hash: string
-}
-
-export function Share({ hash }: Props) {
+export function Share() {
+  const { downloadTransaction } = useSwap()
   return (
     <Fragment>
       <Message
         message={`
-        To proceed, share the following transaction with your counterparty for
-        signing.
-      `}
+          To proceed, download the partially completed transaction and share it
+          with your counterparty for signing.
+        `}
       />
-      <Box css={{ position: 'relative', width: '100%' }}>
-        <Tooltip align="end" content="Copy transaction to clipboard">
-          <Button
-            size="2"
-            css={{
-              position: 'absolute',
-              top: '$2',
-              right: '$5',
-              zIndex: 1,
-            }}
-            onClick={() => copyToClipboard(hash, 'swap transaction')}
-          >
-            <ClipboardIcon />
-          </Button>
-        </Tooltip>
-        <TextArea
-          size="3"
-          rows={4}
-          onClick={() => copyToClipboard(hash, 'swap transaction')}
-          onFocus={(e) => e.target.select()}
-          readOnly
-          spellCheck={false}
-          css={{
-            width: '100%',
-            userSelect: 'none',
-            color: '$gray10',
-          }}
-          value={hash}
-        />
-      </Box>
+      <Button
+        onClick={() => downloadTransaction()}
+        size="3"
+        css={{ width: '100%' }}
+      >
+        Download transaction file
+        <Box as="span" css={{ pl: '$1', lh: '1' }}>
+          <DownloadIcon />
+        </Box>
+      </Button>
       <RLinkButton
         variant="green"
         size="3"
@@ -62,7 +33,7 @@ export function Share({ hash }: Props) {
           width: '100%',
         }}
       >
-        Enter swap from counterparty
+        Load swap from counterparty
         <Box as="span" css={{ pl: '$1', lh: '1' }}>
           <ArrowRightIcon />
         </Box>
