@@ -49,7 +49,7 @@ export function CreateSwap() {
           })
 
           history.push(
-            routes.step.replace(':hash', encodeURIComponent(response.data.raw))
+            routes.step.replace(':raw', encodeURIComponent(response.data.raw))
           )
         } catch (e) {
           if (e instanceof Error) {
