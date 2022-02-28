@@ -167,7 +167,7 @@ func summarizeHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Param
 func walletHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	c, err := siad.WalletGet()
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, c)
@@ -176,7 +176,7 @@ func walletHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 func consensusHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	c, err := siad.ConsensusGet()
 	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
+		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, c)
