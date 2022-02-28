@@ -18,8 +18,6 @@ export function SwapProgress() {
 
   const step = status && stepMap[status]
 
-  console.log(status, step)
-
   return (
     <Flex direction="column" gap="3" css={{ width: '100%' }}>
       <Heading>{capitalize(kebabCase(status).split('-').join(' '))}</Heading>

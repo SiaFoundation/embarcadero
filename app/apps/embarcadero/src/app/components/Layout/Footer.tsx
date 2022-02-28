@@ -1,11 +1,7 @@
 import {
-  Box,
-  Button,
   Flex,
-  keyframes,
   Panel,
   Separator,
-  Status,
   Text,
   Tooltip,
 } from '@siafoundation/design-system'
@@ -14,29 +10,12 @@ import { useSiaStats } from '../../hooks/useSiaStats'
 import { useWallet } from '../../hooks/useWallet'
 import { NetworkStatus } from '../NetworkStatus'
 
-const pulse = keyframes({
-  '0%': {
-    transform: 'scale(1)',
-    opacity: 1,
-  },
-  '30%': {
-    transform: 'scale(2)',
-    opacity: 0,
-  },
-  '100%': {
-    transform: 'scale(2)',
-    opacity: 0,
-  },
-})
-
 export function Footer() {
-  const { data: siaStats, error: errorS } = useSiaStats()
+  const { data: siaStats } = useSiaStats()
   const { data: consensus, error: errorC } = useConsensus()
-  const { data: wallet, error: errorW } = useWallet()
+  const { data: wallet } = useWallet()
 
   const haveData = consensus && siaStats && wallet
-
-  const isIndexing = wallet?.height !== consensus?.height
 
   const isSynced = haveData && consensus.height >= siaStats.block_height
 

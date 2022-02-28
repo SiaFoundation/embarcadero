@@ -41,7 +41,7 @@ export function InputSwap() {
         css={{ width: '100%' }}
         onClick={() =>
           hash &&
-          history.push(routes.step.replace(':hash', encodeURIComponent(hash)))
+          history.push(routes.step.replace(':raw', encodeURIComponent(hash)))
         }
       >
         View transaction
