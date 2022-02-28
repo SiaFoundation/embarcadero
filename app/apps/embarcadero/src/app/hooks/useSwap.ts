@@ -27,16 +27,16 @@ export type SwapSatusLocal = 'creatingANewSwap' | 'loadingAnExistingSwap'
 export type SwapStatusRemoteInt = 0 | 1 | 2 | 3
 
 type SwapStatusRemote =
-  | 'waitingForCounterpartyToAccept'
   | 'waitingForYouToAccept'
+  | 'waitingForCounterpartyToAccept'
   | 'waitingForCounterpartyToFinish'
   | 'waitingForYouToFinish'
 
 const swapStatusRemoteMapping = {
   0: 'waitingForYouToAccept',
   1: 'waitingForCounterpartyToAccept',
-  2: 'waitingForYouToFinish',
-  3: 'waitingForCounterpartyToFinish',
+  2: 'waitingForCounterpartyToFinish',
+  3: 'waitingForYouToFinish',
 } as Record<SwapStatusRemoteInt, SwapStatusRemote>
 
 function getSwapStatusRemote(

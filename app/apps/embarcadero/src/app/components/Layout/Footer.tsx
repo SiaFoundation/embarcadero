@@ -5,12 +5,15 @@ import {
   Text,
   Tooltip,
 } from '@siafoundation/design-system'
+import { Fragment } from 'react'
+import { useConnectivity } from '../../hooks/useConnectivity'
 import { useConsensus } from '../../hooks/useConsensus'
 import { useSiaStats } from '../../hooks/useSiaStats'
 import { useWallet } from '../../hooks/useWallet'
 import { NetworkStatus } from '../NetworkStatus'
 
 export function Footer() {
+  const { siad } = useConnectivity()
   const { data: siaStats } = useSiaStats()
   const { data: consensus, error: errorC } = useConsensus()
   const { data: wallet } = useWallet()
@@ -31,27 +34,31 @@ export function Footer() {
       }}
     >
       <Flex gap="2" align="center">
-        <Tooltip content="Current transaction fee">
-          <Text size="1">
-            {((Number(wallet?.dustthreshold) / Math.pow(10, 24)) * 1024) /
-              0.001}{' '}
-            mS / KB
-          </Text>
-        </Tooltip>
-        <Separator orientation="vertical" />
-        <Tooltip
-          content={
-            isSynced
-              ? 'Block height'
-              : `Block height: ${consensus?.height} / ${siaStats?.block_height}`
-          }
-        >
-          <Text size="1">{consensus?.height}</Text>
-        </Tooltip>
-        <Separator orientation="vertical" />
+        {siad && (
+          <Fragment>
+            <Tooltip content="Current transaction fee">
+              <Text size="1">
+                {((Number(wallet?.dustthreshold) / Math.pow(10, 24)) * 1024) /
+                  0.001}{' '}
+                mS / KB
+              </Text>
+            </Tooltip>
+            <Separator orientation="vertical" />
+            <Tooltip
+              content={
+                isSynced
+                  ? 'Block height'
+                  : `Block height: ${consensus?.height} / ${siaStats?.block_height}`
+              }
+            >
+              <Text size="1">{consensus?.height}</Text>
+            </Tooltip>
+            <Separator orientation="vertical" />
+          </Fragment>
+        )}
         <NetworkStatus
           variant={color}
-          content={isSynced ? 'Synced' : 'Syncing'}
+          content={!siad ? 'Disconnected' : isSynced ? 'Synced' : 'Syncing'}
         />
       </Flex>
     </Panel>

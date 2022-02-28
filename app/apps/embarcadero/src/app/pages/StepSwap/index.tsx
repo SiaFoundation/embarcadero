@@ -3,11 +3,12 @@ import { SwapOverview } from '../../components/SwapOverview'
 import { useSwap } from '../../hooks/useSwap'
 import { usePathParams } from '../../hooks/useHashParam'
 import { Redirect, useHistory } from 'react-router-dom'
-import { Fragment, useCallback } from 'react'
+import { Fragment, useCallback, useState } from 'react'
 import axios from 'axios'
 import { routes } from '../../routes'
 import { Message } from '../../components/Message'
 import { Share } from './Share'
+import { handleResponse } from '../../hooks/handleResponse'
 
 export function StepSwap() {
   const { hash } = usePathParams()
@@ -15,6 +16,7 @@ export function StepSwap() {
   const { status } = useSwap(hash)
 
   const history = useHistory()
+  const [error, setError] = useState<string>()
   const handleMethod = useCallback(
     (method: 'accept' | 'finish') => {
       const func = async () => {
@@ -34,13 +36,14 @@ export function StepSwap() {
           )
         } catch (e) {
           if (e instanceof Error) {
-            console.log(e.message)
+            console.log(e.name, e.message)
+            setError(e.message)
           }
         }
       }
       func()
     },
-    [hash, history]
+    [hash, history, setError]
   )
 
   if (!hash) {
@@ -78,9 +81,12 @@ export function StepSwap() {
           <Fragment>
             <Message
               message={`
-          Accept and sign the transaction to continue. After this, the counterparty can complete the transaction.
-        `}
+              Accept and sign the transaction to continue. After this, the counterparty can complete the transaction.
+            `}
             />
+            {error && (
+              <Message variant="red" message={'Error completing transaction'} />
+            )}
             <Button
               size="3"
               variant="green"
