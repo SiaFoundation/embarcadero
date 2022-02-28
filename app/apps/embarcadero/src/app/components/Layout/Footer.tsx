@@ -12,6 +12,7 @@ import {
 import { useConsensus } from '../../hooks/useConsensus'
 import { useSiaStats } from '../../hooks/useSiaStats'
 import { useWallet } from '../../hooks/useWallet'
+import { NetworkStatus } from '../NetworkStatus'
 
 const pulse = keyframes({
   '0%': {
@@ -69,19 +70,10 @@ export function Footer() {
           <Text size="1">{consensus?.height}</Text>
         </Tooltip>
         <Separator orientation="vertical" />
-        <Tooltip content={isSynced ? 'Synced' : 'Syncing'}>
-          <Box css={{ position: 'relative', top: '-0.5px', marginLeft: '$1' }}>
-            <Status variant={color} />
-            <Status
-              variant={color}
-              css={{
-                animation: `${pulse} 5s infinite`,
-                position: 'absolute',
-                top: 0,
-              }}
-            />
-          </Box>
-        </Tooltip>
+        <NetworkStatus
+          variant={color}
+          content={isSynced ? 'Synced' : 'Syncing'}
+        />
       </Flex>
     </Panel>
   )
