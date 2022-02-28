@@ -1,16 +1,21 @@
-import { InfoCircledIcon } from '@radix-ui/react-icons'
+import { ExclamationTriangleIcon, InfoCircledIcon } from '@radix-ui/react-icons'
 import { Alert, Box, Flex, Text } from '@siafoundation/design-system'
 
 type Props = {
+  variant?: React.ComponentProps<typeof Alert>['variant']
   message: string
 }
 
-export function Message({ message }: Props) {
+export function Message({ variant, message }: Props) {
   return (
-    <Alert>
+    <Alert variant={variant} css={{ width: '100%' }}>
       <Flex gap="2">
         <Box css={{ color: '$hiContrast', position: 'relative', top: '4px' }}>
-          <InfoCircledIcon />
+          {variant === 'red' ? (
+            <ExclamationTriangleIcon />
+          ) : (
+            <InfoCircledIcon />
+          )}
         </Box>
         <Text css={{ lineHeight: '20px' }}>{message}</Text>
       </Flex>

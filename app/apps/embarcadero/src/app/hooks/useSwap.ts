@@ -9,6 +9,7 @@ import {
 import axios from 'axios'
 import BigNumber from 'bignumber.js'
 import { useMemo } from 'react'
+import { useHistory } from 'react-router-dom'
 import useSWR from 'swr'
 import { routes } from '../routes'
 import { usePathParams } from './useHashParam'

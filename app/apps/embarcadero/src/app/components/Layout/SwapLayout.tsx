@@ -1,4 +1,4 @@
-import { Box, Container, Flex, Panel } from '@siafoundation/design-system'
+import { Box, Container, Flex, Grid, Panel } from '@siafoundation/design-system'
 import React from 'react'
 import { SwapNav } from './SwapNav'
 import { SwapProgress } from './SwapProgress'
@@ -12,7 +12,7 @@ export function SwapLayout({ children }: Props) {
     <Container
       size="1"
       css={{
-        padding: '$9 0',
+        padding: '150px 0',
       }}
     >
       <Panel size="3">

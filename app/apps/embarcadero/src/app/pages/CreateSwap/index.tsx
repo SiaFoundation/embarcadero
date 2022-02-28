@@ -1,16 +1,24 @@
 import { ArrowDownIcon } from '@radix-ui/react-icons'
-import { Box, Button, Flex, triggerToast } from '@siafoundation/design-system'
+import {
+  Box,
+  Button,
+  Flex,
+  triggerErrorToast,
+  triggerToast,
+} from '@siafoundation/design-system'
 import axios from 'axios'
 import { useCallback, useMemo, useState } from 'react'
 import { useHistory, useParams } from 'react-router-dom'
 import { Input } from '../../components/Input'
 import { Message } from '../../components/Message'
+import { Connectivity, useConnectivity } from '../../hooks/useConnectivity'
 import { routes } from '../../routes'
 
 type Direction = 'SCtoSF' | 'SFtoSC'
 
 export function CreateSwap() {
   const history = useHistory()
+  const connectivity = useConnectivity()
   const { hash: encodedHash } = useParams<{ hash?: string }>()
   const hash = useMemo(
     () => (encodedHash ? decodeURIComponent(encodedHash) : undefined),
@@ -47,12 +55,16 @@ export function CreateSwap() {
           if (e instanceof Error) {
             console.log(e.message)
           }
+          triggerErrorToast('Error creating swap')
         }
       }
       func()
     },
     [offerSc, history]
   )
+
+  const isValues = sc && sf
+  const connError = getConnError(connectivity)
 
   return (
     <Flex direction="column" align="center" gap="3">
@@ -124,9 +136,10 @@ export function CreateSwap() {
           fee.
       `}
       />
+      {connError && <Message variant="red" message={connError} />}
       <Button
         size="3"
-        disabled={!(sc && sf)}
+        disabled={!connectivity.all || !isValues}
         variant="green"
         css={{ width: '100%', textAlign: 'center' }}
         onClick={() => handleCreate(Number(sc), Number(sf))}
@@ -135,4 +148,17 @@ export function CreateSwap() {
       </Button>
     </Flex>
   )
+}
+
+function getConnError(conn: Connectivity) {
+  if (!conn.embd) {
+    return 'Connect to embd to continue'
+  }
+  if (!conn.siad) {
+    return 'Connect to siad to continue'
+  }
+  if (!conn.wallet) {
+    return 'Unlock wallet to continue'
+  }
+  return ''
 }

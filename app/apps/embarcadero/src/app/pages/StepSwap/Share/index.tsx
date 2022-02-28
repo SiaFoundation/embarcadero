@@ -20,12 +20,12 @@ export function Share({ hash }: Props) {
     <Fragment>
       <Message
         message={`
-        To proceed, share the following hash with your counterparty for
+        To proceed, share the following transaction with your counterparty for
         signing.
       `}
       />
       <Box css={{ position: 'relative', width: '100%' }}>
-        <Tooltip align="end" content="Copy hash to clipboard">
+        <Tooltip align="end" content="Copy transaction to clipboard">
           <Button
             size="2"
             css={{
@@ -34,7 +34,7 @@ export function Share({ hash }: Props) {
               right: '$5',
               zIndex: 1,
             }}
-            onClick={() => copyToClipboard(hash, 'swap hash')}
+            onClick={() => copyToClipboard(hash, 'swap transaction')}
           >
             <ClipboardIcon />
           </Button>
@@ -42,7 +42,7 @@ export function Share({ hash }: Props) {
         <TextArea
           size="3"
           rows={4}
-          onClick={() => copyToClipboard(hash, 'swap hash')}
+          onClick={() => copyToClipboard(hash, 'swap transaction')}
           onFocus={(e) => e.target.select()}
           readOnly
           spellCheck={false}
