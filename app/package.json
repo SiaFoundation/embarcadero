@@ -14,8 +14,9 @@
   "private": true,
   "dependencies": {
     "@radix-ui/react-icons": "^1.0.3",
-    "@siafoundation/design-system": "^0.0.6",
-    "@siafoundation/sia-js": "^0.1.0",
+    "@siafoundation/design-system": "^0.4.2",
+    "@siafoundation/sia-js": "^0.2.0",
+    "@siafoundation/sia-react": "^0.3.0",
     "axios": "^0.24.0",
     "bignumber.js": "^9.0.2",
     "core-js": "^3.6.5",
@@ -23,12 +24,12 @@
     "lodash": "^4.17.21",
     "react": "17.0.2",
     "react-dom": "17.0.2",
-    "react-dropzone": "^12.0.4",
     "react-hot-toast": "^2.2.0",
     "react-router-dom": "5.3.0",
     "regenerator-runtime": "0.13.7",
     "swr": "^1.2.0",
-    "tslib": "^2.0.0"
+    "tslib": "^2.0.0",
+    "use-local-storage-state": "^15.0.0"
   },
   "devDependencies": {
     "@nrwl/cli": "13.4.6",
@@ -42,6 +43,7 @@
     "@nrwl/workspace": "13.4.6",
     "@testing-library/react": "12.1.2",
     "@testing-library/react-hooks": "7.0.2",
+    "@types/carbon__icons-react": "^10.31.2",
     "@types/express": "4.17.0",
     "@types/jest": "27.0.2",
     "@types/lodash": "^4.14.178",
