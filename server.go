@@ -138,6 +138,7 @@ type summarizeRequest struct {
 }
 
 type summarizeResponse struct {
+	ID      string          `json:"id"`
 	Summary SwapSummary     `json:"summary"`
 	Swap    SwapTransaction `json:"swap"`
 }
@@ -159,6 +160,7 @@ func summarizeHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Param
 		return
 	}
 	writeJSON(w, summarizeResponse{
+		ID:      swap.Transaction().ID().String(),
 		Summary: summary,
 		Swap:    swap,
 	})

@@ -11,7 +11,7 @@ func summarizeCLI(swap SwapTransaction) error {
 	if err != nil {
 		return err
 	}
-	ours, theirs := s.AmountSC.HumanString(), s.AmountSF.String()
+	ours, theirs := s.AmountSC.HumanString(), s.AmountSF.HumanString()
 	if s.ReceiveSF {
 		theirs, ours = ours, theirs
 	}

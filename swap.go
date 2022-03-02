@@ -406,7 +406,10 @@ func Summarize(swap SwapTransaction) (s SwapSummary, err error) {
 			s.Stage++
 			receiveSCHasSigned := swap.Signatures[0].ParentID == crypto.Hash(swap.SiacoinInputs[0].ParentID)
 			receiveSFHasSigned := swap.Signatures[0].ParentID == crypto.Hash(swap.SiafundInputs[0].ParentID)
-			if (s.ReceiveSC && receiveSCHasSigned) || (s.ReceiveSF && receiveSFHasSigned) {
+			if s.ReceiveSC && receiveSCHasSigned {
+				s.Stage++
+			}
+			if s.ReceiveSF && receiveSFHasSigned {
 				s.Stage++
 			}
 		}
