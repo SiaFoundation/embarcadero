@@ -98,7 +98,7 @@ export function SwapProvider({ children }: Props) {
         setFileReadError('Invalid transaction file')
       }
     },
-    [setRaw, history, setFileReadError]
+    [setRaw, history, setFileReadError, currentRoute]
   )
 
   const loadTransactionFromFile = useCallback(
@@ -119,7 +119,7 @@ export function SwapProvider({ children }: Props) {
       }
       reader.readAsArrayBuffer(file)
     },
-    [setRaw, setFileReadError]
+    [setFileReadError, validateTransactionFile]
   )
 
   const setTransaction = useCallback(
@@ -157,7 +157,7 @@ export function SwapProvider({ children }: Props) {
       }
       func()
     },
-    [raw, history, setTransactionError]
+    [raw, setTransactionError, setTransaction]
   )
 
   const { route } = usePathParams()

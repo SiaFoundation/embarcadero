@@ -7,6 +7,7 @@ export function Home() {
   const { clearTransaction } = useSwap()
   useEffect(() => {
     clearTransaction()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (
