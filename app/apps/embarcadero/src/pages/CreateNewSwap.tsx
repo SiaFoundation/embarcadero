@@ -23,6 +23,7 @@ export function CreateNewSwap() {
 
   useEffect(() => {
     clearTransaction()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const [direction, setDirection] = useState<Direction>('SCtoSF')
