@@ -14,7 +14,7 @@
   "private": true,
   "dependencies": {
     "@radix-ui/react-icons": "^1.0.3",
-    "@siafoundation/design-system": "^0.4.2",
+    "@siafoundation/design-system": "^0.5.3",
     "@siafoundation/sia-js": "^0.2.0",
     "@siafoundation/sia-react": "^0.3.0",
     "axios": "^0.24.0",
