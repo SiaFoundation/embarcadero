@@ -39,8 +39,7 @@ type createRequest struct {
 }
 
 type createResponse struct {
-	Swap SwapTransaction `json:"transaction"`
-	Raw  string          `json:"raw"`
+	Swap SwapTransaction `json:"swap"`
 }
 
 func createHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -61,17 +60,16 @@ func createHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 	}
 	writeJSON(w, createResponse{
 		Swap: swap,
-		Raw:  EncodeSwap(swap),
 	})
 }
 
 type acceptRequest struct {
-	Raw string `json:"raw"`
+	Swap SwapTransaction `json:"swap"`
 }
 
 type acceptResponse struct {
-	ID  string `json:"id"`
-	Raw string `json:"raw"`
+	ID   string          `json:"id"`
+	Swap SwapTransaction `json:"swap"`
 }
 
 func acceptHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -80,32 +78,27 @@ func acceptHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	swap, err := DecodeSwap(ar.Raw)
-	if err != nil {
+	if err := CheckAccept(ar.Swap); err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := CheckAccept(swap); err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	if err := AcceptSwap(&swap); err != nil {
+	if err := AcceptSwap(&ar.Swap); err != nil {
 		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, acceptResponse{
-		ID:  swap.Transaction().ID().String(),
-		Raw: EncodeSwap(swap),
+		ID:   ar.Swap.Transaction().ID().String(),
+		Swap: ar.Swap,
 	})
 }
 
 type finishRequest struct {
-	Raw string `json:"raw"`
+	Swap SwapTransaction `json:"swap"`
 }
 
 type finishResponse struct {
-	ID  string `json:"id"`
-	Raw string `json:"raw"`
+	ID   string          `json:"id"`
+	Swap SwapTransaction `json:"swap"`
 }
 
 func finishHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
@@ -114,27 +107,22 @@ func finishHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	swap, err := DecodeSwap(fr.Raw)
-	if err != nil {
+	if err := CheckFinish(fr.Swap); err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := CheckFinish(swap); err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	if err := FinishSwap(&swap); err != nil {
+	if err := FinishSwap(&fr.Swap); err != nil {
 		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, finishResponse{
-		ID:  swap.Transaction().ID().String(),
-		Raw: EncodeSwap(swap),
+		ID:   fr.Swap.Transaction().ID().String(),
+		Swap: fr.Swap,
 	})
 }
 
 type summarizeRequest struct {
-	Raw string `json:"raw"`
+	Swap SwapTransaction `json:"swap"`
 }
 
 type summarizeResponse struct {
@@ -149,20 +137,15 @@ func summarizeHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Param
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	swap, err := DecodeSwap(fr.Raw)
-	if err != nil {
-		writeError(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	summary, err := Summarize(swap)
+	summary, err := Summarize(fr.Swap)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	writeJSON(w, summarizeResponse{
-		ID:      swap.Transaction().ID().String(),
+		ID:      fr.Swap.Transaction().ID().String(),
 		Summary: summary,
-		Swap:    swap,
+		Swap:    fr.Swap,
 	})
 }
 
