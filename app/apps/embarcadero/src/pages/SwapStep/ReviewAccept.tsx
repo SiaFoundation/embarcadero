@@ -1,16 +1,11 @@
 import { Button, Flex } from '@siafoundation/design-system'
-import { SwapOverview } from '../components/SwapOverview'
-import { useSwap } from '../contexts/swap'
+import { SwapOverview } from '../../components/SwapOverview'
+import { useSwap } from '../../contexts/swap'
 import { Fragment } from 'react'
-import { Message } from '../components/Message'
-import { useRouteToStep } from '../hooks/useRouteToStep'
-import { useProtectSwapRoute } from '../hooks/useProtectSwapRoute'
+import { Message } from '../../components/Message'
 
 export function ReviewAccept() {
   const { signTransaction, transactionError } = useSwap()
-
-  useRouteToStep()
-  useProtectSwapRoute()
 
   return (
     <Flex direction="column" align="center" gap="3">

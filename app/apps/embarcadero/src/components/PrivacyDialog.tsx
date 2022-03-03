@@ -3,7 +3,6 @@ import {
   Box,
   DialogTitle,
   Information16,
-  Text,
   Flex,
   Heading,
   Switch,

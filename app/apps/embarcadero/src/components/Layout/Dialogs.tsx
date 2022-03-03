@@ -1,11 +1,8 @@
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogOverlay,
   DialogPortal,
-  DialogTitle,
-  DialogTrigger,
 } from '@siafoundation/design-system'
 import { useDialog } from '../../contexts/dialog'
 import { PrivacyDialog } from '../PrivacyDialog'

@@ -1,5 +1,5 @@
-import { ArrowDownIcon } from '@radix-ui/react-icons'
 import {
+  ArrowDown16,
   Box,
   Button,
   Flex,
@@ -50,7 +50,7 @@ export function CreateNewSwap() {
           })
 
           setTransaction(response.data.raw)
-          history.push(routes.waitingForCounterpartyToAccept)
+          history.push(routes.swap)
         } catch (e) {
           if (e instanceof Error) {
             console.log(e.message)
@@ -125,7 +125,7 @@ export function CreateNewSwap() {
                 },
               }}
             >
-              <ArrowDownIcon />
+              <ArrowDown16 />
             </Flex>
           </Box>
         </Box>

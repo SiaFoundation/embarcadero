@@ -1,4 +1,4 @@
-import { Code, Dropzone, Paragraph, Text } from '@siafoundation/design-system'
+import { Code, Dropzone, Paragraph } from '@siafoundation/design-system'
 import { useSwap } from '../contexts/swap'
 
 export function SwapDropzone() {

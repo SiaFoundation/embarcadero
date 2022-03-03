@@ -22,9 +22,9 @@ import { downloadFile } from '../lib/download'
 import { useHistory } from 'react-router-dom'
 import {
   getSwapStatusRemote,
-  SwapSatusLocal,
+  SwapStatusLocal,
   SwapStatus,
-  SwapStatusRemoteInt,
+  SwapStageRemoteInt,
 } from '../lib/swapStatus'
 
 export type SwapTransaction = {
@@ -42,7 +42,7 @@ type SwapSummary = {
   amountSC: string
   amountSF: string
   amountFee: string
-  stage: SwapStatusRemoteInt
+  stage: SwapStageRemoteInt
 }
 
 type SummarizeResponse = {
@@ -81,6 +81,7 @@ export function SwapProvider({ children }: Props) {
   const [raw, setRaw] = useState<string>()
   const [fileReadError, setFileReadError] = useState<string>()
   const [transactionError, setTransactionError] = useState<string>()
+  const { route: currentRoute } = usePathParams()
   const history = useHistory()
 
   const validateTransactionFile = useCallback(
@@ -89,6 +90,10 @@ export function SwapProvider({ children }: Props) {
       if (data) {
         setFileReadError(undefined)
         setRaw(data)
+        const nextRoute: keyof typeof routes = 'swap'
+        if (currentRoute !== nextRoute) {
+          history.push(routes.swap)
+        }
       } else {
         setFileReadError('Invalid transaction file')
       }
@@ -202,10 +207,10 @@ export function SwapProvider({ children }: Props) {
     return new BigNumber(amountSF)
   }, [response])
 
-  let localStatus: SwapSatusLocal | undefined = undefined
-  if (route === routes.creatingANewSwap.slice(1)) {
+  let localStatus: SwapStatusLocal | undefined = undefined
+  if (route === routes.create.slice(1)) {
     localStatus = 'creatingANewSwap'
-  } else if (route === routes.loadingAnExistingSwap.slice(1)) {
+  } else if (route === routes.input.slice(1)) {
     localStatus = 'loadingAnExistingSwap'
   }
 
@@ -227,7 +232,7 @@ export function SwapProvider({ children }: Props) {
     fileReadError,
     transactionError,
   }
-  console.log(id, response.isValidating)
+  console.log(id, !!raw, response.isValidating)
 
   return <SwapContext.Provider value={value}>{children}</SwapContext.Provider>
 }

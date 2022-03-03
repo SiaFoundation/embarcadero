@@ -1,5 +1,4 @@
-import { ArrowDownIcon } from '@radix-ui/react-icons'
-import { Box, Flex } from '@siafoundation/design-system'
+import { ArrowDown16, Box, Flex } from '@siafoundation/design-system'
 import { Input } from './Input'
 import { useSwap } from '../contexts/swap'
 import { Message } from './Message'
@@ -57,7 +56,7 @@ export function SwapOverview() {
                 width: '30px',
               }}
             >
-              <ArrowDownIcon />
+              <ArrowDown16 />
             </Flex>
           </Box>
         </Box>
