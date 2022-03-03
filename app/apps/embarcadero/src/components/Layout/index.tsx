@@ -1,16 +1,8 @@
-import {
-  Toaster,
-  Background,
-  ScrollArea,
-  Dialog,
-  DialogContent,
-  Button,
-} from '@siafoundation/design-system'
+import { Toaster, Background, ScrollArea } from '@siafoundation/design-system'
 import React from 'react'
 import { Footer } from './Footer'
 import { Navbar } from './Navbar'
 import { SwapLayout } from '../SwapLayout'
-import { useDialog } from '../../contexts/dialog'
 import { Dialogs } from './Dialogs'
 
 type Props = {

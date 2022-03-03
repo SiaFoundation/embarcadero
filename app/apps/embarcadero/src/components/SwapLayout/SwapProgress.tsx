@@ -3,19 +3,20 @@ import { capitalize, kebabCase } from 'lodash'
 import { useSwap } from '../../contexts/swap'
 import { SwapStatus } from '../../lib/swapStatus'
 
-const stepMap = {
+const statusToStep = {
   creatingANewSwap: 0,
   loadingAnExistingSwap: 0,
-  waitingForYouToAccept: 1,
+  waitingForYouToAccept: 2,
   waitingForCounterpartyToAccept: 2,
   waitingForCounterpartyToFinish: 3,
-  waitingForYouToFinish: 4,
+  waitingForYouToFinish: 3,
+  transactionComplete: 4,
 } as Record<SwapStatus, number>
 
 export function SwapProgress() {
   const { status } = useSwap()
 
-  const step = status && stepMap[status]
+  const step = status && statusToStep[status]
 
   return (
     <Flex direction="column" gap="3" css={{ width: '100%' }}>

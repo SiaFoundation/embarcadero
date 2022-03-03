@@ -8,6 +8,7 @@ export function Home() {
   useEffect(() => {
     clearTransaction()
   }, [])
+
   return (
     <Flex direction="column" gap="2">
       <Flex direction="column" gap="4">
@@ -15,12 +16,8 @@ export function Home() {
           Welcome to Embarcadero, a tool for conducting escrowless SC/SF swaps.
         </Paragraph>
         <Flex direction="column" gap="4" align="start" css={{ mb: '$2' }}>
-          <RLink to={routes.creatingANewSwap}>
-            Create a new swap transaction →
-          </RLink>
-          <RLink to={routes.loadingAnExistingSwap}>
-            Load an existing swap transaction →
-          </RLink>
+          <RLink to={routes.create}>Create a new swap transaction →</RLink>
+          <RLink to={routes.input}>Load an existing swap transaction →</RLink>
         </Flex>
       </Flex>
       <Separator size="3" />

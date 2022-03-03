@@ -1,15 +1,10 @@
 import { Flex, Number_132, Number_232 } from '@siafoundation/design-system'
-import { SwapOverview } from '../components/SwapOverview'
-import { DownloadTransaction } from '../components/DownloadTransaction'
-import { Message } from '../components/Message'
-import { useRouteToStep } from '../hooks/useRouteToStep'
-import { useProtectSwapRoute } from '../hooks/useProtectSwapRoute'
-import { SwapDropzone } from '../components/SwapDropzone'
+import { SwapOverview } from '../../components/SwapOverview'
+import { DownloadTransaction } from '../../components/DownloadTransaction'
+import { Message } from '../../components/Message'
+import { SwapDropzone } from '../../components/SwapDropzone'
 
 export function WaitingFinish() {
-  useRouteToStep()
-  useProtectSwapRoute()
-
   return (
     <Flex direction="column" align="center" gap="3">
       <SwapOverview />
