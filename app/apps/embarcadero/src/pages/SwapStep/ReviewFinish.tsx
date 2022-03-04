@@ -3,9 +3,17 @@ import { SwapOverview } from '../../components/SwapOverview'
 import { useSwap } from '../../contexts/swap'
 import { Fragment } from 'react'
 import { Message } from '../../components/Message'
+import { useTxnHasBalance } from '../../hooks/useTxnHasBalance'
+import { useConnectivity } from '../../hooks/useConnectivity'
+import { ErrorMessageConn } from '../../components/ErrorMessageConn'
+import { ErrorMessageTxn } from '../../components/ErrorMessageTxn'
 
 export function ReviewFinish() {
-  const { signTransaction, transactionError } = useSwap()
+  const { signTxn } = useSwap()
+  const { all } = useConnectivity()
+  const hasBalance = useTxnHasBalance()
+
+  const readyToSign = all && hasBalance
 
   return (
     <Flex direction="column" align="center" gap="3">
@@ -22,14 +30,14 @@ export function ReviewFinish() {
                 Sign and broadcast the transaction to complete the swap.
               `}
           />
-          {transactionError && (
-            <Message variant="red" message={'Error completing transaction'} />
-          )}
+          <ErrorMessageTxn />
+          <ErrorMessageConn />
           <Button
             size="3"
             variant="green"
             css={{ width: '100%' }}
-            onClick={() => signTransaction('finish')}
+            disabled={!readyToSign}
+            onClick={() => signTxn('finish')}
           >
             Sign and broadcast transaction
           </Button>

@@ -12,7 +12,7 @@ export function SwapLayout({ children }: Props) {
     <Container
       size="1"
       css={{
-        padding: '100px 0',
+        padding: '20px 0',
       }}
     >
       <Panel

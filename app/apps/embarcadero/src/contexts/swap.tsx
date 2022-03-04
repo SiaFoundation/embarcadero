@@ -15,10 +15,9 @@ import {
 } from '@siafoundation/sia-js'
 import axios from 'axios'
 import BigNumber from 'bignumber.js'
-import useSWR from 'swr'
 import { routes } from '../routes'
 import { usePathParams } from '../hooks/usePathParams'
-import { downloadFile } from '../lib/download'
+import { downloadJsonFile } from '../lib/download'
 import { useHistory } from 'react-router-dom'
 import {
   getSwapStatusRemote,
@@ -26,6 +25,8 @@ import {
   SwapStatus,
   SwapStageRemoteInt,
 } from '../lib/swapStatus'
+import { swapTxnSchema } from '../lib/validate'
+import { api } from '../config'
 
 export type SwapTransaction = {
   siacoinInputs: SiacoinInput[]
@@ -48,26 +49,24 @@ type SwapSummary = {
 type SummarizeResponse = {
   id: string
   summary: SwapSummary
-  swap: SwapTransaction
 }
 
 type State = {
   id?: string
-  isValidating: boolean
+  txn?: SwapTransaction
   summary?: SwapSummary
-  transaction?: SwapTransaction
   status?: SwapStatus
   offerSc: boolean
   sf?: BigNumber
   sc?: BigNumber
-  raw?: string
-  loadTransactionFromFile: (file: File) => void
-  clearTransaction: () => void
-  downloadTransaction: () => void
-  setTransaction: (raw: string) => void
-  signTransaction: (step: 'accept' | 'finish') => void
+  isValidating: boolean
+  loadTxnFromFile: (file: File) => void
+  resetTxn: () => void
+  downloadTxn: () => void
+  loadTxn: (txn: SwapTransaction) => void
+  signTxn: (step: 'accept' | 'finish') => void
   fileReadError?: string
-  transactionError?: string
+  txnError?: string
 }
 
 const SwapContext = createContext({} as State)
@@ -78,30 +77,83 @@ type Props = {
 }
 
 export function SwapProvider({ children }: Props) {
-  const [raw, setRaw] = useState<string>()
-  const [fileReadError, setFileReadError] = useState<string>()
-  const [transactionError, setTransactionError] = useState<string>()
   const { route: currentRoute } = usePathParams()
   const history = useHistory()
 
-  const validateTransactionFile = useCallback(
-    (data: string) => {
-      // TODO: add validation
-      if (data) {
-        setFileReadError(undefined)
-        setRaw(data)
-        const nextRoute: keyof typeof routes = 'swap'
-        if (currentRoute !== nextRoute) {
-          history.push(routes.swap)
+  const [txn, setTxn] = useState<SwapTransaction>()
+  const [id, setId] = useState<string>()
+  const [summary, setSummary] = useState<SwapSummary>()
+  const [isValidating, setIsValidating] = useState<boolean>(false)
+
+  const [fileReadError, setFileReadError] = useState<string>()
+  const [txnError, setTxnError] = useState<string>()
+
+  const resetTxn = useCallback(() => {
+    setId(undefined)
+    setSummary(undefined)
+    setTxn(undefined)
+    setTxnError(undefined)
+  }, [setId, setSummary, setTxn, setTxnError])
+
+  const loadTxn = useCallback(
+    (txn: SwapTransaction) => {
+      const func = async () => {
+        try {
+          setIsValidating(true)
+          const { data, error } = await fetchSummary(txn)
+
+          if (data) {
+            const { id, summary } = data
+            setFileReadError(undefined)
+            setId(id)
+            setSummary(summary)
+            setTxn(txn)
+            const nextRoute: keyof typeof routes = 'swap'
+            if (currentRoute !== nextRoute) {
+              history.push(routes.swap)
+            }
+          } else {
+            setFileReadError('Invalid transaction file')
+          }
+        } catch (e) {
+          setFileReadError('Invalid transaction file')
+        } finally {
+          setIsValidating(false)
         }
-      } else {
-        setFileReadError('Invalid transaction file')
       }
+      func()
     },
-    [setRaw, history, setFileReadError, currentRoute]
+    [setTxn, history, setFileReadError, currentRoute]
   )
 
-  const loadTransactionFromFile = useCallback(
+  const validateAndLoadTxnFile = useCallback(
+    (fileData: string) => {
+      const func = async () => {
+        try {
+          setIsValidating(true)
+
+          const txn = JSON.parse(fileData) as SwapTransaction
+
+          const validated = swapTxnSchema.validate(txn)
+
+          if (validated.error) {
+            setFileReadError('Invalid transaction file')
+            return
+          }
+
+          loadTxn(txn)
+        } catch (e) {
+          setFileReadError('Invalid transaction file')
+        } finally {
+          setIsValidating(false)
+        }
+      }
+      func()
+    },
+    [loadTxn, setFileReadError]
+  )
+
+  const loadTxnFromFile = useCallback(
     (file: File) => {
       const reader = new FileReader()
       const decoder = new TextDecoder()
@@ -115,124 +167,123 @@ export function SwapProvider({ children }: Props) {
       reader.onload = () => {
         const bin = reader.result
         const str = decoder.decode(bin as ArrayBuffer)
-        validateTransactionFile(str)
+
+        if (str) {
+          validateAndLoadTxnFile(str)
+        } else {
+          setFileReadError('Empty transaction file')
+        }
       }
       reader.readAsArrayBuffer(file)
     },
-    [setFileReadError, validateTransactionFile]
+    [setFileReadError, validateAndLoadTxnFile]
   )
 
-  const setTransaction = useCallback(
-    (raw: string) => {
-      setRaw(raw)
-    },
-    [setRaw]
-  )
-
-  const clearTransaction = useCallback(() => {
-    setRaw(undefined)
-  }, [setRaw])
-
-  const signTransaction = useCallback(
+  const signTxn = useCallback(
     (step: 'accept' | 'finish') => {
       const func = async () => {
         try {
           const response = await axios({
             method: 'post',
-            url: `http://localhost:8080/api/${step}`,
+            url: `${api}/api/${step}`,
             headers: {
               'Content-Type': 'application/json',
             },
             data: {
-              raw,
+              swap: txn,
             },
           })
 
-          setTransaction(response.data.raw)
+          loadTxn(response.data.swap)
         } catch (e) {
           if (e instanceof Error) {
-            setTransactionError(e.message)
+            setTxnError(e.message)
           }
         }
       }
       func()
     },
-    [raw, setTransactionError, setTransaction]
+    [txn, setTxnError, loadTxn]
   )
 
-  const { route } = usePathParams()
-  const response = useSWR<SummarizeResponse>(raw, async () => {
+  const downloadTxn = useCallback(() => {
+    if (id && txn) {
+      downloadJsonFile(`embc_txn_${id.slice(0, 6)}`, txn)
+    }
+  }, [id, txn])
+
+  const { sc, sf, offerSc } = useMemo(() => {
+    if (!summary) {
+      return {
+        sc: undefined,
+        sf: undefined,
+        offerSc: false,
+      }
+    }
+
+    const { amountSC, amountSF, receiveSF } = summary
+
+    const sc = toSiacoins(new BigNumber(amountSC))
+    const sf = new BigNumber(amountSF)
+    const offerSc = !!receiveSF
+
+    return {
+      sc,
+      sf,
+      offerSc,
+    }
+  }, [summary])
+
+  let localStatus: SwapStatusLocal | undefined = undefined
+  if (currentRoute === routes.create.slice(1)) {
+    localStatus = 'creatingANewSwap'
+  } else if (currentRoute === routes.input.slice(1)) {
+    localStatus = 'loadingAnExistingSwap'
+  }
+
+  const status = getSwapStatusRemote(summary?.stage) || localStatus
+
+  const value: State = {
+    id,
+    isValidating,
+    summary,
+    txn,
+    status,
+    offerSc,
+    sf,
+    sc,
+    loadTxnFromFile,
+    resetTxn,
+    downloadTxn,
+    loadTxn,
+    signTxn,
+    fileReadError,
+    txnError,
+  }
+
+  return <SwapContext.Provider value={value}>{children}</SwapContext.Provider>
+}
+
+async function fetchSummary(txn: SwapTransaction) {
+  try {
     const res = await axios({
       method: 'post',
-      url: 'http://localhost:8080/api/summarize',
+      url: `${api}/api/summarize`,
       headers: {
         'Content-Type': 'application/json',
       },
       data: {
-        raw,
+        swap: txn,
       },
     })
-    return res.data
-  })
-
-  const id = response.data?.id
-
-  const downloadTransaction = useCallback(() => {
-    if (id && raw) {
-      downloadFile(`transaction_${id.slice(0, 5)}`, raw)
+    return {
+      data: res.data as SummarizeResponse,
+      error: undefined,
     }
-  }, [id, raw])
-
-  const offerSc = useMemo(() => {
-    return !!response.data?.summary.receiveSF
-  }, [response])
-
-  const sc = useMemo(() => {
-    if (!response.data?.summary) {
-      return undefined
+  } catch (e) {
+    return {
+      error: e,
+      data: undefined,
     }
-
-    const { amountSC } = response.data.summary
-
-    return toSiacoins(new BigNumber(amountSC))
-  }, [response])
-
-  const sf = useMemo(() => {
-    if (!response.data?.summary) {
-      return undefined
-    }
-
-    const { amountSF } = response.data.summary
-
-    return new BigNumber(amountSF)
-  }, [response])
-
-  let localStatus: SwapStatusLocal | undefined = undefined
-  if (route === routes.create.slice(1)) {
-    localStatus = 'creatingANewSwap'
-  } else if (route === routes.input.slice(1)) {
-    localStatus = 'loadingAnExistingSwap'
   }
-
-  const value: State = {
-    id,
-    isValidating: response.isValidating,
-    summary: response.data?.summary,
-    transaction: response.data?.swap,
-    status: getSwapStatusRemote(response.data?.summary.stage) || localStatus,
-    offerSc,
-    sf,
-    sc,
-    raw,
-    loadTransactionFromFile,
-    clearTransaction,
-    downloadTransaction,
-    setTransaction,
-    signTransaction,
-    fileReadError,
-    transactionError,
-  }
-  console.log(id, !!raw, response.isValidating)
-
-  return <SwapContext.Provider value={value}>{children}</SwapContext.Provider>
 }

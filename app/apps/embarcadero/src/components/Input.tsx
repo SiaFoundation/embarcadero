@@ -1,17 +1,17 @@
 import { Box, Flex, Label, Text, TextField } from '@siafoundation/design-system'
-import { toSiacoins } from '@siafoundation/sia-js'
-import { useMemo } from 'react'
-import { useSiaStatsNetworkStatus, useWallet } from '@siafoundation/sia-react'
-import { api } from '../config'
+import { useSiaStatsNetworkStatus } from '@siafoundation/sia-react'
 import { useSettings } from '../hooks/useSettings'
+import { useHasBalance } from '../hooks/useHasBalance'
+import BigNumber from 'bignumber.js'
+import { useCallback } from 'react'
 
 type Props = {
   disabled?: boolean
   isOffer?: boolean
   currency: 'SF' | 'SC'
   type: 'integer' | 'decimal'
-  value: string | undefined
-  onChange?: (value: string | undefined) => void
+  value?: BigNumber
+  onChange?: (value?: BigNumber) => void
 }
 
 export function Input({
@@ -24,22 +24,28 @@ export function Input({
 }: Props) {
   const { settings } = useSettings()
   const { data } = useSiaStatsNetworkStatus({
-    // disabled: !settings.siaStats
-  })
-  const { data: wallet } = useWallet({
-    api,
+    disabled: !settings.siaStats,
   })
   const scPrice = settings.siaStats && data?.coin_price_USD
 
-  const hasAvailableBalance = useMemo(() => {
-    if (!isOffer || !value) {
-      return true
-    }
-    if (currency === 'SC') {
-      return toSiacoins(wallet?.confirmedsiacoinbalance || 0).gte(Number(value))
-    }
-    return Number(wallet?.siafundbalance) >= Number(value)
-  }, [isOffer, currency, value, wallet])
+  const hasAvailableBalance = useHasBalance({
+    value,
+    isOffer,
+    currency,
+  })
+
+  const handleChange = useCallback(
+    (e) => {
+      if (!onChange) {
+        return
+      }
+
+      const { value } = e.target
+      const num = value ? new BigNumber(value) : undefined
+      onChange(num)
+    },
+    [onChange]
+  )
 
   const usdValue =
     currency === 'SC' && Number(value) && scPrice
@@ -76,8 +82,8 @@ export function Input({
           variant="totalGhost"
           noSpin
           type="number"
-          value={value !== undefined ? value : ''}
-          onChange={(e) => onChange && onChange(e.target.value)}
+          value={value !== undefined ? value.toString() : ''}
+          onChange={handleChange}
           placeholder={type === 'integer' ? '0' : '0.0'}
           css={{
             '&:disabled': {

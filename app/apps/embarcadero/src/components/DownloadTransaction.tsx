@@ -2,10 +2,10 @@ import { Box, Button, DocumentDownload16 } from '@siafoundation/design-system'
 import { useSwap } from '../contexts/swap'
 
 export function DownloadTransaction() {
-  const { downloadTransaction } = useSwap()
+  const { downloadTxn } = useSwap()
   return (
     <Button
-      onClick={() => downloadTransaction()}
+      onClick={() => downloadTxn()}
       size="3"
       variant="green"
       css={{ width: '100%' }}
