@@ -17,8 +17,8 @@ export function WaitingFinish() {
         <Message
           icon={<Number_132 />}
           message={`
-            To finish the swap, download the transaction file and share it
-            with your counterparty for signing.
+            To finalize the swap, download the transaction file and share it
+            with your counterparty. Your counterparty can then sign and broadcast the completed transaction.
           `}
         />
         <DownloadTransaction />

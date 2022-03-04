@@ -4,9 +4,9 @@ import { useSwap } from '../contexts/swap'
 import { routes } from '../routes'
 
 export function Home() {
-  const { clearTransaction } = useSwap()
+  const { resetTxn } = useSwap()
   useEffect(() => {
-    clearTransaction()
+    resetTxn()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 

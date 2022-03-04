@@ -10,9 +10,9 @@ import {
 import { SwapTransaction, useSwap } from '../../../contexts/swap'
 
 export function TransactionDetails() {
-  const { transaction } = useSwap()
+  const { txn } = useSwap()
 
-  if (!transaction) {
+  if (!txn) {
     return (
       <Text css={{ p: '$3 $2', color: '$slate9' }}>
         Load a swap to view details
@@ -20,7 +20,7 @@ export function TransactionDetails() {
     )
   }
 
-  const keys = Object.keys(transaction) as (keyof SwapTransaction)[]
+  const keys = Object.keys(txn) as (keyof SwapTransaction)[]
 
   return (
     <Box css={{ pl: '$3' }}>
@@ -29,13 +29,13 @@ export function TransactionDetails() {
           <AccordionItem key={key} value={key}>
             <AccordionTrigger>
               <Text size="3" css={{ fontWeight: 500 }}>
-                {key} ({transaction[key]?.length || 0})
+                {key} ({txn[key]?.length || 0})
               </Text>
             </AccordionTrigger>
             <AccordionContent>
               <pre>
                 <Codeblock css={{ overflow: 'auto' }}>
-                  {JSON.stringify(transaction[key], null, 2)}
+                  {JSON.stringify(txn[key], null, 2)}
                 </Codeblock>
               </pre>
             </AccordionContent>

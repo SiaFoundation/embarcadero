@@ -2,12 +2,13 @@ import { ArrowDown16, Box, Flex } from '@siafoundation/design-system'
 import { Input } from './Input'
 import { useSwap } from '../contexts/swap'
 import { Message } from './Message'
+import { useHasBalance } from '../hooks/useHasBalance'
 
 export function SwapOverview() {
-  const { offerSc, sc, sf, transaction } = useSwap()
+  const { offerSc, sc, sf, txn } = useSwap()
 
-  const scInputs = transaction?.siacoinInputs?.length || 0
-  const sfInputs = transaction?.siafundInputs?.length || 0
+  const scInputs = txn?.siacoinInputs?.length || 0
+  const sfInputs = txn?.siafundInputs?.length || 0
   const totalInputs = scInputs + sfInputs
 
   return (
@@ -18,7 +19,7 @@ export function SwapOverview() {
             currency="SC"
             type="decimal"
             disabled
-            value={sc?.toString()}
+            value={sc}
             isOffer={offerSc}
           />
         </Box>
@@ -27,7 +28,7 @@ export function SwapOverview() {
             currency="SF"
             type="integer"
             disabled
-            value={sf?.toString()}
+            value={sf}
             isOffer={!offerSc}
           />
         </Box>

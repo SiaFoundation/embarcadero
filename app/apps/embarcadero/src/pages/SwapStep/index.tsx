@@ -18,11 +18,15 @@ const componentMap: Record<SwapStatusRemote, () => JSX.Element> = {
 }
 
 export function SwapStep() {
-  const { status } = useSwap()
+  const { isValidating, status } = useSwap()
   const { route: currentRoute } = usePathParams()
 
-  if (!status) {
+  if (isValidating) {
     return null
+  }
+
+  if (!status) {
+    return <Redirect to={routes.home} />
   }
 
   const nextRoute = swapStatusToRoute[status]

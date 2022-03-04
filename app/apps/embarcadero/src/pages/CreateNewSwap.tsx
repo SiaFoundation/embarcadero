@@ -7,65 +7,65 @@ import {
 } from '@siafoundation/design-system'
 import axios from 'axios'
 import { useCallback, useEffect, useState } from 'react'
-import { useHistory } from 'react-router-dom'
 import { Input } from '../components/Input'
 import { Message } from '../components/Message'
-import { Connectivity, useConnectivity } from '../hooks/useConnectivity'
+import { useConnectivity } from '../hooks/useConnectivity'
 import { useSwap } from '../contexts/swap'
-import { routes } from '../routes'
+import { api } from '../config'
+import BigNumber from 'bignumber.js'
+import { ErrorMessageConn } from '../components/ErrorMessageConn'
 
 type Direction = 'SCtoSF' | 'SFtoSC'
 
 export function CreateNewSwap() {
-  const history = useHistory()
   const connectivity = useConnectivity()
-  const { transaction, setTransaction, clearTransaction } = useSwap()
+  const { txn, loadTxn, resetTxn } = useSwap()
 
   useEffect(() => {
-    clearTransaction()
+    resetTxn()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const [direction, setDirection] = useState<Direction>('SCtoSF')
-  const [sc, setSc] = useState<string>()
-  const [sf, setSf] = useState<string>()
+  const [sc, setSc] = useState<BigNumber>()
+  const [sf, setSf] = useState<BigNumber>()
   const offerSc = direction === 'SCtoSF'
 
-  const handleCreate = useCallback(
-    (sc: number, sf: number) => {
-      const func = async () => {
-        const offer = offerSc ? `${sc}SC` : `${sf}SF`
-        const receive = offerSc ? `${sf}SF` : `${sc}SC`
-
-        try {
-          const response = await axios({
-            method: 'post',
-            url: 'http://localhost:8080/api/create',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            data: {
-              offer,
-              receive,
-            },
-          })
-
-          setTransaction(response.data.raw)
-          history.push(routes.swap)
-        } catch (e) {
-          if (e instanceof Error) {
-            console.log(e.message)
-          }
-          triggerErrorToast('Error creating swap transaction')
-        }
-      }
-      func()
-    },
-    [offerSc, history, setTransaction]
-  )
-
   const isValues = sc && sf
-  const connError = getConnError(connectivity)
+  const readyToCreate = connectivity.all && isValues
+
+  const handleCreate = useCallback(() => {
+    if (!readyToCreate) {
+      return
+    }
+
+    const func = async () => {
+      const offer = offerSc ? `${sc.toString()}SC` : `${sf.toString()}SF`
+      const receive = offerSc ? `${sf.toString()}SF` : `${sc.toString()}SC`
+
+      try {
+        const response = await axios({
+          method: 'post',
+          url: `${api}/api/create`,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          data: {
+            offer,
+            receive,
+          },
+        })
+
+        loadTxn(response.data.swap)
+      } catch (e) {
+        if (e instanceof Error) {
+          console.log(e.message)
+        }
+        triggerErrorToast('Error creating swap transaction')
+      }
+    }
+    func()
+  }, [sc, sf, readyToCreate, offerSc, loadTxn])
 
   return (
     <Flex direction="column" align="center" gap="3">
@@ -74,7 +74,7 @@ export function CreateNewSwap() {
           <Input
             currency="SC"
             type="decimal"
-            disabled={!!transaction}
+            disabled={!!txn}
             value={sc}
             onChange={setSc}
             isOffer={offerSc}
@@ -84,7 +84,7 @@ export function CreateNewSwap() {
           <Input
             currency="SF"
             type="integer"
-            disabled={!!transaction}
+            disabled={!!txn}
             value={sf}
             onChange={setSf}
             isOffer={!offerSc}
@@ -93,7 +93,7 @@ export function CreateNewSwap() {
         <Box css={{ height: '$2', zIndex: 1, order: 2 }}>
           <Box
             onClick={() => {
-              if (transaction) {
+              if (txn) {
                 return
               }
               setDirection(direction === 'SCtoSF' ? 'SFtoSC' : 'SCtoSF')
@@ -121,7 +121,7 @@ export function CreateNewSwap() {
                 height: '30px',
                 width: '30px',
                 transition: 'background 0.1s linear',
-                '&:hover': !transaction && {
+                '&:hover': !txn && {
                   backgroundColor: '$primary10',
                 },
               }}
@@ -137,29 +137,16 @@ export function CreateNewSwap() {
           fee.
       `}
       />
-      {connError && <Message variant="red" message={connError} />}
+      <ErrorMessageConn />
       <Button
         size="3"
-        disabled={!connectivity.all || !isValues}
+        disabled={!readyToCreate}
         variant="green"
         css={{ width: '100%', textAlign: 'center' }}
-        onClick={() => handleCreate(Number(sc), Number(sf))}
+        onClick={() => handleCreate()}
       >
         Generate swap
       </Button>
     </Flex>
   )
-}
-
-function getConnError(conn: Connectivity) {
-  if (!conn.embd) {
-    return 'Connect to embd to continue'
-  }
-  if (!conn.siad) {
-    return 'Connect to siad to continue'
-  }
-  if (!conn.wallet) {
-    return 'Unlock wallet to continue'
-  }
-  return ''
 }
