@@ -8,8 +8,7 @@
   "scripts": {
     "start": "nx serve",
     "build": "nx build",
-    "test": "nx test",
-    "types": "go run libs/sia-js/src/types/gen.go"
+    "test": "nx test"
   },
   "private": true,
   "dependencies": {

@@ -3,9 +3,7 @@ module go.sia.tech/embarcadero
 go 1.17
 
 require (
-	github.com/OneOfOne/struct2ts v1.0.6
 	github.com/julienschmidt/httprouter v1.3.0
-	gitlab.com/NebulousLabs/encoding v0.0.0-20200604091946-456c3dc907fe
 	go.sia.tech/siad v1.5.7
 	lukechampine.com/flagg v1.1.1
 )
@@ -20,6 +18,7 @@ require (
 	github.com/klauspost/cpuid v1.2.2 // indirect
 	github.com/klauspost/reedsolomon v1.9.3 // indirect
 	gitlab.com/NebulousLabs/bolt v1.4.4 // indirect
+	gitlab.com/NebulousLabs/encoding v0.0.0-20200604091946-456c3dc907fe // indirect
 	gitlab.com/NebulousLabs/entropy-mnemonics v0.0.0-20181018051301-7532f67e3500 // indirect
 	gitlab.com/NebulousLabs/errors v0.0.0-20200929122200-06c536cf6975 // indirect
 	gitlab.com/NebulousLabs/fastrand v0.0.0-20181126182046-603482d69e40 // indirect
