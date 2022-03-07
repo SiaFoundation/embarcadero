@@ -32,7 +32,7 @@ The counterparty must add their own inputs with 'embc accept' before the
 transaction can be signed and broadcast.
 `
 	acceptUsage = `Usage:
-embc accept [txn]
+embc accept [file_path]
 
 Displays a proposed swap transaction. If you accept the proposal, your inputs
 will be added to complete the swap. The resulting transaction must be returned
@@ -41,7 +41,7 @@ and ready for broadcasting.
 `
 
 	finishUsage = `Usage:
-embc finish [txn]
+embc finish [file_path]
 
 Displays a proposed swap transaction. If you accept the proposal, your
 signatures will be added, finalizing the transaction. The transaction is then
