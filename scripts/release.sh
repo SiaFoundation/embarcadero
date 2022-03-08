@@ -26,7 +26,7 @@ for OS in linux windows darwin; do
 		if [ "$OS" = "darwin" ]; then
 			codesign --deep -f -v --timestamp -o runtime,library -s $APPLE_CERT_ID dist/embarcadero/embarcadero
 			ditto -ck dist/embarcadero $ZIP_OUTPUT
-			xcrun notarytool submit -k ~/.private_keys/AuthKey_39554JCL5N.p8 -d $APPLE_API_KEY -i $APPLE_API_ISSUER --wait --timeout 10m $ZIP_OUTPUT
+			xcrun notarytool submit -k ~/private_keys/AuthKey_$APPLE_API_KEY.p8 -d $APPLE_API_KEY -i $APPLE_API_ISSUER --wait --timeout 10m $ZIP_OUTPUT
 		else
 			zip -qj $ZIP_OUTPUT dist/embarcadero/*
 		fi
