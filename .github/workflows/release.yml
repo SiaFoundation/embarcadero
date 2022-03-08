@@ -1,0 +1,70 @@
+name: Release
+on:
+  workflow_dispatch:
+  push:
+    branches:
+        - master
+    tags: 
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-rc[0-9]+'
+
+jobs:
+  release:
+    runs-on: macos-latest
+    env:
+      APPLE_CERT_ID: ${{ secrets.APPLE_CERT_ID }}
+      APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+      APPLE_KEY_B64: ${{ secrets.APPLE_KEY_B64 }}
+      APPLE_CERT_B64: ${{ secrets.APPLE_CERT_B64 }}
+      APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+      APPLE_KEYCHAIN_PASSWORD: ${{ secrets.APPLE_KEYCHAIN_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup
+        uses: ./.github/actions/setup
+        with:
+          node_version: 16
+          go-version: '1.17'
+      - name: Test
+        uses: ./.github/actions/test
+      - name: Setup notarization
+        run: |
+          # extract apple cert
+          APPLE_CERT_PATH=$RUNNER_TEMP/apple_cert.p12
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+          echo -n "$APPLE_CERT_B64" | base64 --decode --output $APPLE_CERT_PATH
+
+          # extract apple key
+          mkdir -p ~/private_keys
+          APPLE_API_KEY_PATH=~/private_keys/AuthKey_$APPLE_API_KEY.p8
+          echo -n "$APPLE_KEY_B64" | base64 --decode --output $APPLE_API_KEY_PATH
+
+          # create temp keychain
+          security create-keychain -p "$APPLE_KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$APPLE_KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+
+          # import keychain
+          security import $APPLE_CERT_PATH -P $APPLE_CERT_PASSWORD -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k $APPLE_KEYCHAIN_PASSWORD $KEYCHAIN_PATH
+      - name: Build web
+        shell: bash
+        run: npx nx build
+        working-directory: ./app
+      - name: Package
+        shell: bash
+        run: scripts/release.sh
+      - name: Save artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: releases
+          if-no-files-found: error
+          path: release/*
+          retention-days: 30
+      - name: cleanup
+        if: ${{ always() }}
+        run: |
+          security delete-keychain $RUNNER_TEMP/app-signing.keychain-db
+          rm -rf .env* build/bin $RUNNER_TEMP/* ~/private_keys 2> /dev/null
