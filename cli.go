@@ -8,38 +8,34 @@ import (
 	"strings"
 )
 
-var (
-	stageToDescription = []string{
-		"Waiting for you to accept",
-		"Waiting for counterparty to accept",
-		"Waiting for counterparty to finish",
-		"Waiting for you to finish",
-		"Swap transaction complete"}
-)
+var stages = []string{
+	0: "Waiting for you to accept",
+	1: "Waiting for counterparty to accept",
+	2: "Waiting for counterparty to finish",
+	3: "Waiting for you to finish",
+	4: "Swap transaction complete",
+}
 
-func encodeSwapFile(s SwapTransaction) (name string) {
-	txnID := s.Transaction().ID().String()
-	name = fmt.Sprintf("embc_txn_%s.json", txnID[0:6])
-	f, err := os.Create(name)
+func encodeSwapFile(s SwapTransaction) (string, error) {
+	txnID := s.Transaction().ID()
+	f, err := os.Create(fmt.Sprintf("embc_txn_%x.json", txnID[:4]))
 	if err != nil {
-		fmt.Println(err)
+		return "", err
 	}
 	defer f.Close()
-	encodeJSON(f, s)
-	return
+	if err := encodeJSON(f, s); err != nil {
+		return "", err
+	}
+	return f.Name(), nil
 }
 
 func decodeSwapFile(filePath string) (swap SwapTransaction, err error) {
 	f, err := os.Open(filePath)
 	if err != nil {
-		fmt.Println(err)
+		return SwapTransaction{}, err
 	}
 	defer f.Close()
-
-	if err := json.NewDecoder(f).Decode(&swap); err != nil {
-		fmt.Printf("%s", swap.Transaction().ID().String())
-	}
-
+	err = json.NewDecoder(f).Decode(&swap)
 	return
 }
 
@@ -53,9 +49,9 @@ func printSummary(swap SwapTransaction) error {
 		theirs, ours = ours, theirs
 	}
 	fmt.Println("Swap summary:")
-	fmt.Println("  You receive           ", ours)
-	fmt.Println("  Counterparty receives ", theirs)
-	fmt.Println("  Stage                 ", stageToDescription[s.Stage])
+	fmt.Println("  You receive:           ", ours)
+	fmt.Println("  Counterparty receives: ", theirs)
+	fmt.Println("  Stage:                 ", stages[s.Stage])
 	if s.ReceiveSF {
 		fmt.Println()
 		fmt.Println("  You will also pay the 5 SC transaction fee.")
@@ -68,7 +64,10 @@ func printTransaction(swap SwapTransaction) error {
 	if err != nil {
 		return err
 	}
-	nextFilePath := encodeSwapFile(swap)
+	nextFilePath, err := encodeSwapFile(swap)
+	if err != nil {
+		return err
+	}
 	fmt.Println("Transaction:")
 	fmt.Println("  ID:   ", swap.Transaction().ID())
 	fmt.Println("  File: ", nextFilePath)

@@ -85,15 +85,15 @@ func ParseCurrency(amount string) types.Currency {
 	return types.Currency{}
 }
 
-func encodeJSON(w io.Writer, v interface{}) {
+func encodeJSON(w io.Writer, v interface{}) error {
 	// encode nil slices as [] instead of null
 	if val := reflect.ValueOf(v); val.Kind() == reflect.Slice && val.Len() == 0 {
-		w.Write([]byte("[]\n"))
-		return
+		_, err := w.Write([]byte("[]\n"))
+		return err
 	}
 	enc := json.NewEncoder(w)
 	enc.SetIndent("", "  ")
-	enc.Encode(v)
+	return enc.Encode(v)
 }
 
 func addSC(swap *SwapTransaction, amount types.Currency) error {
