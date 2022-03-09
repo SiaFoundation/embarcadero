@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
-	"reflect"
 	"runtime"
 	"strings"
 
@@ -18,14 +17,7 @@ import (
 func writeJSON(w http.ResponseWriter, v interface{}) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.Header().Set("Content-Type", "application/json")
-	// encode nil slices as [] instead of null
-	if val := reflect.ValueOf(v); val.Kind() == reflect.Slice && val.Len() == 0 {
-		w.Write([]byte("[]\n"))
-		return
-	}
-	enc := json.NewEncoder(w)
-	enc.SetIndent("", "  ")
-	enc.Encode(v)
+	encodeJSON(w, v)
 }
 
 func writeError(w http.ResponseWriter, err string, code int) {

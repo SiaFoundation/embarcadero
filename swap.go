@@ -1,14 +1,15 @@
 package main
 
 import (
-	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"math/big"
+	"reflect"
 	"strings"
 
-	"gitlab.com/NebulousLabs/encoding"
 	"go.sia.tech/siad/crypto"
 	"go.sia.tech/siad/node/api/client"
 	"go.sia.tech/siad/types"
@@ -84,20 +85,15 @@ func ParseCurrency(amount string) types.Currency {
 	return types.Currency{}
 }
 
-// EncodeSwap encodes the swap transaction into a base64 string.
-func EncodeSwap(swap SwapTransaction) string {
-	return base64.StdEncoding.EncodeToString(encoding.Marshal(swap))
-}
-
-// DecodeSwap decodes a base64 encoded swap transaction.
-func DecodeSwap(s string) (SwapTransaction, error) {
-	data, err := base64.StdEncoding.DecodeString(s)
-	if err != nil {
-		return SwapTransaction{}, fmt.Errorf("failed to decode base64: %w", err)
+func encodeJSON(w io.Writer, v interface{}) error {
+	// encode nil slices as [] instead of null
+	if val := reflect.ValueOf(v); val.Kind() == reflect.Slice && val.Len() == 0 {
+		_, err := w.Write([]byte("[]\n"))
+		return err
 	}
-	var swap SwapTransaction
-	err = encoding.Unmarshal(data, &swap)
-	return swap, err
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	return enc.Encode(v)
 }
 
 func addSC(swap *SwapTransaction, amount types.Currency) error {
