@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/julienschmidt/httprouter v1.3.0
-	go.sia.tech/siad v1.5.7
+	go.sia.tech/siad v1.5.8-0.20220326194532-4aab495f51cb
 	lukechampine.com/flagg v1.1.1
 )
 
@@ -22,7 +22,7 @@ require (
 	gitlab.com/NebulousLabs/entropy-mnemonics v0.0.0-20181018051301-7532f67e3500 // indirect
 	gitlab.com/NebulousLabs/errors v0.0.0-20200929122200-06c536cf6975 // indirect
 	gitlab.com/NebulousLabs/fastrand v0.0.0-20181126182046-603482d69e40 // indirect
-	gitlab.com/NebulousLabs/go-upnp v0.0.0-20210414172302-67b91c9a5c03 // indirect
+	gitlab.com/NebulousLabs/go-upnp v0.0.0-20211002182029-11da932010b6 // indirect
 	gitlab.com/NebulousLabs/log v0.0.0-20200604091839-0ba4a941cdc2 // indirect
 	gitlab.com/NebulousLabs/merkletree v0.0.0-20200118113624-07fbf710afc4 // indirect
 	gitlab.com/NebulousLabs/persist v0.0.0-20200605115618-007e5e23d877 // indirect
