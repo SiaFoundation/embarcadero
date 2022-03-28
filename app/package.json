@@ -12,7 +12,7 @@
   },
   "private": true,
   "dependencies": {
-    "@siafoundation/design-system": "^0.5.3",
+    "@siafoundation/design-system": "^0.11.8",
     "@siafoundation/sia-js": "^0.2.0",
     "@siafoundation/sia-react": "^0.3.0",
     "axios": "^0.24.0",
