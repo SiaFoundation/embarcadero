@@ -9,12 +9,12 @@ import (
 )
 
 var statusToDescription = map[string]string{
-	"waitingForYouToAccept":          "Waiting for you to accept",
-	"waitingForCounterpartyToAccept": "Waiting for counterparty to accept",
-	"waitingForYouToFinish":          "Waiting for you to finish",
-	"waitingForCounterpartyToFinish": "Waiting for counterparty to finish",
-	"swapTransactionPending":         "Swap transaction pending",
-	"swapTransactionConfirmed":       "Swap transaction confirmed",
+	waitingForYouToAccept:          "Waiting for you to accept",
+	waitingForCounterpartyToAccept: "Waiting for counterparty to accept",
+	waitingForYouToFinish:          "Waiting for you to finish",
+	waitingForCounterpartyToFinish: "Waiting for counterparty to finish",
+	swapTransactionPending:         "Swap transaction pending",
+	swapTransactionConfirmed:       "Swap transaction confirmed",
 }
 
 func encodeSwapFile(s SwapTransaction) (string, error) {
@@ -42,7 +42,7 @@ func decodeSwapFile(filePath string) (swap SwapTransaction, err error) {
 
 func noUserInteractionRequired(s SwapSummary) bool {
 	switch s.Status {
-	case "waitingForCounterpartyToAccept", "waitingForCounterpartyToFinish", "swapTransactionPending", "swapTransactionConfirmed":
+	case waitingForCounterpartyToAccept, waitingForCounterpartyToFinish, swapTransactionPending, swapTransactionConfirmed:
 		return true
 	default:
 		return false
@@ -51,7 +51,7 @@ func noUserInteractionRequired(s SwapSummary) bool {
 
 func userStepsComplete(s SwapSummary) bool {
 	switch s.Status {
-	case "swapTransactionPending", "swapTransactionConfirmed":
+	case swapTransactionPending, swapTransactionConfirmed:
 		return true
 	default:
 		return false
@@ -60,7 +60,7 @@ func userStepsComplete(s SwapSummary) bool {
 
 func acceptStepsComplete(s SwapSummary) bool {
 	switch s.Status {
-	case "waitingForYouToAccept", "waitingForCounterpartyToAccept":
+	case waitingForYouToAccept, waitingForCounterpartyToAccept:
 		return false
 	default:
 		return true

@@ -20,6 +20,15 @@ var siad *client.Client
 
 var minerFee = types.SiacoinPrecision.Mul64(5)
 
+const (
+	waitingForYouToAccept          = "waitingForYouToAccept"
+	waitingForCounterpartyToAccept = "waitingForCounterpartyToAccept"
+	waitingForYouToFinish          = "waitingForYouToFinish"
+	waitingForCounterpartyToFinish = "waitingForCounterpartyToFinish"
+	swapTransactionPending         = "swapTransactionPending"
+	swapTransactionConfirmed       = "swapTransactionConfirmed"
+)
+
 // A SwapTransaction is a transaction that swaps Siacoin for Siafunds between
 // two parties.
 type SwapTransaction struct {
@@ -428,21 +437,21 @@ func acceptStatus(swap SwapTransaction) string {
 	}
 	for _, addr := range wag.Addresses {
 		if swap.SiacoinOutputs[0].UnlockHash == addr || swap.SiafundOutputs[0].UnlockHash == addr {
-			return "waitingForCounterpartyToAccept"
+			return waitingForCounterpartyToAccept
 		}
 	}
-	return "waitingForYouToAccept"
+	return waitingForYouToAccept
 }
 
 // finishStatus checks if the swap is ready to be finished and which party needs to finish.
 func finishStatus(swap SwapTransaction) string {
 	err := checkFinish(swap, false)
 	if err == nil {
-		return "waitingForYouToFinish"
+		return waitingForYouToFinish
 	}
 	err = checkFinish(swap, true)
 	if err == nil {
-		return "waitingForCounterpartyToFinish"
+		return waitingForCounterpartyToFinish
 	}
 	return ""
 }
@@ -454,9 +463,9 @@ func txnStatus(swap SwapTransaction) string {
 		return ""
 	}
 	if wtg.Transaction.ConfirmationHeight == math.MaxUint64 {
-		return "swapTransactionPending"
+		return swapTransactionPending
 	}
-	return "swapTransactionConfirmed"
+	return swapTransactionConfirmed
 }
 
 // status gets the overall status of a swap txn.
