@@ -23,29 +23,33 @@ const pulse = keyframes({
 
 type Props = {
   variant: React.ComponentProps<typeof Status>['variant']
-  content: string
+  content?: string
 }
 
 export function NetworkStatus({ variant, content }: Props) {
-  return (
-    <Tooltip content={content}>
-      <Flex
-        align="center"
-        justify="center"
-        css={{ width: '16px', height: '16px' }}
-      >
-        <Box css={{ position: 'relative' }}>
-          <Status variant={variant} />
-          <Status
-            variant={variant}
-            css={{
-              animation: `${pulse} 5s infinite`,
-              position: 'absolute',
-              top: 0,
-            }}
-          />
-        </Box>
-      </Flex>
-    </Tooltip>
+  const el = (
+    <Flex
+      align="center"
+      justify="center"
+      css={{ width: '16px', height: '16px' }}
+    >
+      <Box css={{ position: 'relative' }}>
+        <Status variant={variant} />
+        <Status
+          variant={variant}
+          css={{
+            animation: `${pulse} 5s infinite`,
+            position: 'absolute',
+            top: 0,
+          }}
+        />
+      </Box>
+    </Flex>
   )
+
+  if (content) {
+    return <Tooltip content={content}>{el}</Tooltip>
+  }
+
+  return el
 }

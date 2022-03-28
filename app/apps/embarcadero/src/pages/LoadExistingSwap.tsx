@@ -7,7 +7,7 @@ export function LoadExistingSwap() {
     <Flex direction="column" align="center" gap="3">
       <Message
         message={`
-          Retrieve swap transaction file from your counterparty and open it to begin.
+          Retrieve a swap transaction file from your counterparty and open it to begin.
       `}
       />
       <SwapDropzone />

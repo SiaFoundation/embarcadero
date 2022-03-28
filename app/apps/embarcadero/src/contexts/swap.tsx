@@ -4,6 +4,8 @@ import React, {
   useContext,
   useCallback,
   useState,
+  useEffect,
+  useRef,
 } from 'react'
 import {
   SiacoinInput,
@@ -108,15 +110,16 @@ export function SwapProvider({ children }: Props) {
             setId(id)
             setSummary(summary)
             setTxn(txn)
+            console.log(id, summary, txn)
             const nextRoute: keyof typeof routes = 'swap'
             if (currentRoute !== nextRoute) {
               history.push(routes.swap)
             }
           } else {
-            setFileReadError('Invalid transaction file')
+            setTxnError('Error fetching transaction summary.')
           }
         } catch (e) {
-          setFileReadError('Invalid transaction file')
+          setFileReadError('Invalid transaction file.')
         } finally {
           setIsValidating(false)
         }
@@ -135,15 +138,16 @@ export function SwapProvider({ children }: Props) {
           const txn = JSON.parse(fileData) as SwapTransaction
 
           const validated = swapTxnSchema.validate(txn)
-
           if (validated.error) {
-            setFileReadError('Invalid transaction file')
+            console.log(validated.error)
+            setFileReadError('Invalid transaction file.')
             return
           }
 
           loadTxn(txn)
         } catch (e) {
-          setFileReadError('Invalid transaction file')
+          console.log(e)
+          setFileReadError('Invalid transaction file.')
         } finally {
           setIsValidating(false)
         }
@@ -162,7 +166,7 @@ export function SwapProvider({ children }: Props) {
         console.log('file reading was aborted')
       }
       reader.onerror = () => {
-        setFileReadError('Failed to read transaction file')
+        setFileReadError('Failed to read transaction file.')
       }
       reader.onload = () => {
         const bin = reader.result
@@ -171,7 +175,7 @@ export function SwapProvider({ children }: Props) {
         if (str) {
           validateAndLoadTxnFile(str)
         } else {
-          setFileReadError('Empty transaction file')
+          setFileReadError('Empty transaction file.')
         }
       }
       reader.readAsArrayBuffer(file)
@@ -197,7 +201,7 @@ export function SwapProvider({ children }: Props) {
           loadTxn(response.data.swap)
         } catch (e) {
           if (e instanceof Error) {
-            setTxnError(e.message)
+            setTxnError('Error signing transaction.')
           }
         }
       }
@@ -236,12 +240,42 @@ export function SwapProvider({ children }: Props) {
 
   let localStatus: SwapStatusLocal | undefined = undefined
   if (currentRoute === routes.create.slice(1)) {
-    localStatus = 'creatingANewSwap'
+    localStatus = 'createANewSwap'
   } else if (currentRoute === routes.input.slice(1)) {
-    localStatus = 'loadingAnExistingSwap'
+    localStatus = 'openASwap'
   }
 
   const status = getSwapStatusRemote(summary?.stage) || localStatus
+
+  const ref = useRef({
+    txn,
+  })
+
+  useEffect(() => {
+    ref.current.txn = txn
+  }, [txn])
+
+  useEffect(() => {
+    if (
+      txn &&
+      status &&
+      (
+        [
+          'waitingForCounterpartyToFinish',
+          'swapTransactionPending',
+        ] as SwapStatus[]
+      ).includes(status)
+    ) {
+      startPolling(() => {
+        if (ref.current.txn) {
+          loadTxn(ref.current?.txn)
+        }
+      })
+    } else {
+      stopPolling()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status])
 
   const value: State = {
     id,
@@ -285,5 +319,20 @@ async function fetchSummary(txn: SwapTransaction) {
       error: e,
       data: undefined,
     }
+  }
+}
+
+let interval: NodeJS.Timer | null = null
+
+function startPolling(func: () => void): void {
+  if (!interval) {
+    interval = setInterval(func, 5_000)
+  }
+}
+
+function stopPolling(): void {
+  if (interval) {
+    clearInterval(interval)
+    interval = null
   }
 }

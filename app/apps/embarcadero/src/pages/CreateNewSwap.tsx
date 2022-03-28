@@ -14,6 +14,7 @@ import { useSwap } from '../contexts/swap'
 import { api } from '../config'
 import BigNumber from 'bignumber.js'
 import { ErrorMessageConn } from '../components/ErrorMessageConn'
+import { ToggleInputs } from '../components/ToggleInputs'
 
 type Direction = 'SCtoSF' | 'SFtoSC'
 
@@ -26,7 +27,7 @@ export function CreateNewSwap() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const [direction, setDirection] = useState<Direction>('SCtoSF')
+  const [direction, setDirection] = useState<Direction>('SFtoSC')
   const [sc, setSc] = useState<BigNumber>()
   const [sf, setSf] = useState<BigNumber>()
   const offerSc = direction === 'SCtoSF'
@@ -74,6 +75,7 @@ export function CreateNewSwap() {
           <Input
             currency="SC"
             type="decimal"
+            tabIndex={offerSc ? 1 : 3}
             disabled={!!txn}
             value={sc}
             onChange={setSc}
@@ -84,69 +86,51 @@ export function CreateNewSwap() {
           <Input
             currency="SF"
             type="integer"
+            tabIndex={offerSc ? 3 : 1}
             disabled={!!txn}
             value={sf}
             onChange={setSf}
             isOffer={!offerSc}
           />
         </Box>
-        <Box css={{ height: '$2', zIndex: 1, order: 2 }}>
-          <Box
-            onClick={() => {
-              if (txn) {
-                return
-              }
-              setDirection(direction === 'SCtoSF' ? 'SFtoSC' : 'SCtoSF')
-            }}
-            css={{
-              position: 'relative',
-              top: '-15px',
-              height: '40px',
-              width: '40px',
-              backgroundColor: '$loContrast',
-              borderRadius: '15px',
-            }}
-          >
-            <Flex
-              align="center"
-              justify="center"
-              css={{
-                backgroundColor: '$gray7',
-                borderRadius: '$4',
-                position: 'absolute',
-                transform: 'translate(-50%, -50%)',
-                left: '50%',
-                color: '$hiContrast',
-                top: '50%',
-                height: '30px',
-                width: '30px',
-                transition: 'background 0.1s linear',
-                '&:hover': !txn && {
-                  backgroundColor: '$primary10',
-                },
-              }}
-            >
-              <ArrowDown16 />
-            </Flex>
-          </Box>
-        </Box>
+        <ToggleInputs
+          onToggle={() => {
+            if (txn) {
+              return
+            }
+            setDirection(direction === 'SCtoSF' ? 'SFtoSC' : 'SCtoSF')
+          }}
+          disabled={!txn}
+        />
       </Flex>
-      <Message
-        message={`
-          The party that contributes SC is responsible for paying the miner
-          fee.
-      `}
-      />
-      <ErrorMessageConn />
-      <Button
-        size="3"
-        disabled={!readyToCreate}
-        variant="green"
-        css={{ width: '100%', textAlign: 'center' }}
-        onClick={() => handleCreate()}
-      >
-        Generate swap
-      </Button>
+      <Flex direction="column" align="center" gap="1-5">
+        {direction === 'SCtoSF' && (
+          <Message
+            variant="info"
+            message={`
+            The party sending SC is responsible for paying the miner fee.
+          `}
+          />
+        )}
+        {direction === 'SFtoSC' && (
+          <Message
+            variant="info"
+            message={`
+            The party sending SF will receive a separate SC payout for with file contract dividends
+          `}
+          />
+        )}
+        <ErrorMessageConn />
+        <Button
+          size="3"
+          disabled={!readyToCreate}
+          variant="accent"
+          css={{ width: '100%', textAlign: 'center', borderRadius: '$2' }}
+          onClick={() => handleCreate()}
+        >
+          Generate swap
+        </Button>
+      </Flex>
     </Flex>
   )
 }

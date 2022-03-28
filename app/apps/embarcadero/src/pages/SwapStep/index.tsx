@@ -2,28 +2,30 @@ import { ReviewAccept } from './ReviewAccept'
 import { ReviewFinish } from './ReviewFinish'
 import { WaitingAccept } from './WaitingAccept'
 import { WaitingFinish } from './WaitingFinish'
-import { TransactionComplete } from './TransactionComplete'
+import { TxnConfirmed } from './TxnConfirmed'
 import { SwapStatusRemote } from '../../lib/swapStatus'
 import { useSwap } from '../../contexts/swap'
 import { Redirect } from 'react-router-dom'
 import { swapStatusToRoute, routes } from '../../routes'
 import { usePathParams } from '../../hooks/usePathParams'
+import { TxnPending } from './TxnPending'
 
 const componentMap: Record<SwapStatusRemote, () => JSX.Element> = {
   waitingForYouToAccept: ReviewAccept,
   waitingForCounterpartyToAccept: WaitingAccept,
-  waitingForCounterpartyToFinish: WaitingFinish,
   waitingForYouToFinish: ReviewFinish,
-  transactionComplete: TransactionComplete,
+  waitingForCounterpartyToFinish: WaitingFinish,
+  swapTransactionPending: TxnPending,
+  swapTransactionConfirmed: TxnConfirmed,
 }
 
 export function SwapStep() {
   const { isValidating, status } = useSwap()
   const { route: currentRoute } = usePathParams()
 
-  if (isValidating) {
-    return null
-  }
+  // if (isValidating) {
+  //   return null
+  // }
 
   if (!status) {
     return <Redirect to={routes.home} />
@@ -31,7 +33,7 @@ export function SwapStep() {
 
   const nextRoute = swapStatusToRoute[status]
 
-  if (currentRoute !== nextRoute) {
+  if (!isValidating && currentRoute !== nextRoute) {
     return <Redirect to={routes[nextRoute]} />
   }
 

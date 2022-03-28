@@ -1,4 +1,11 @@
-import { Box, Flex, Label, Text, TextField } from '@siafoundation/design-system'
+import {
+  Box,
+  Flex,
+  Label,
+  Text,
+  TextField,
+  Tooltip,
+} from '@siafoundation/design-system'
 import { useSiaStatsNetworkStatus } from '@siafoundation/sia-react'
 import { useSettings } from '../hooks/useSettings'
 import { useHasBalance } from '../hooks/useHasBalance'
@@ -11,6 +18,7 @@ type Props = {
   currency: 'SF' | 'SC'
   type: 'integer' | 'decimal'
   value?: BigNumber
+  tabIndex?: number
   onChange?: (value?: BigNumber) => void
 }
 
@@ -19,6 +27,7 @@ export function Input({
   isOffer,
   type,
   disabled = false,
+  tabIndex,
   value,
   onChange,
 }: Props) {
@@ -48,28 +57,26 @@ export function Input({
   )
 
   const usdValue =
-    currency === 'SC' && Number(value) && scPrice
-      ? scPrice * Number(value)
-      : null
+    currency === 'SC' && value && scPrice ? scPrice * value.toNumber() : null
 
   return (
     <Flex
       direction="column"
-      gap="2"
+      gap="1-5"
       css={{
-        backgroundColor: '$gray3',
+        backgroundColor: '$brandGray3',
         border: '2px solid',
         borderColor: !hasAvailableBalance ? '$red8' : 'transparent',
         borderRadius: '$2',
-        padding: '$2',
+        padding: '$1-5',
         transition: 'border 50ms linear',
         '&:hover': !disabled && {
-          borderColor: !hasAvailableBalance ? '$red9' : '$primary6',
+          borderColor: !hasAvailableBalance ? '$red9' : '$brandAccent7',
         },
       }}
     >
-      <Label css={{ color: '$gray10' }}>
-        {isOffer ? 'You are offering' : 'You are receiving'}
+      <Label css={{ color: '$brandGray10' }}>
+        {isOffer ? 'You will send' : 'You will receive'}
       </Label>
       <Box
         css={{
@@ -77,7 +84,8 @@ export function Input({
         }}
       >
         <TextField
-          disabled={disabled}
+          readOnly={disabled}
+          tabIndex={tabIndex}
           size="3"
           variant="totalGhost"
           noSpin
@@ -86,33 +94,49 @@ export function Input({
           onChange={handleChange}
           placeholder={type === 'integer' ? '0' : '0.0'}
           css={{
+            px: 0,
             '&:disabled': {
               color: '$hiContrast',
             },
           }}
         />
-        <Flex
-          align="center"
-          css={{
-            position: 'absolute',
-            top: 0,
-            right: '5px',
-            backgroundColor: '$gray4',
-            borderRadius: '$2',
-            border: '1px solid $gray5',
-            height: '100%',
-            padding: '$1 $2',
-          }}
-        >
-          <Text css={{ fontWeight: 'bolder' }}>{currency}</Text>
-        </Flex>
+        <Tooltip content={currency === 'SF' ? 'Siafunds' : 'Siacoins'}>
+          <Flex
+            align="center"
+            css={{
+              position: 'absolute',
+              top: 0,
+              right: '5px',
+              backgroundColor: '$brandGray4',
+              borderRadius: '$2',
+              border: '1px solid $brandGray5',
+              height: '100%',
+              padding: '0 $1-5',
+              ...(currency === 'SF' && {
+                border: '1px dashed $orange8',
+                backgroundColor: '$orange4',
+              }),
+            }}
+          >
+            <Text
+              css={{
+                fontWeight: 'bolder',
+                ...(currency === 'SF' && {
+                  color: '$orange12',
+                }),
+              }}
+            >
+              {currency}
+            </Text>
+          </Flex>
+        </Tooltip>
       </Box>
       <Flex justify="between" css={{ pr: '$1' }}>
         {!hasAvailableBalance && <Text>Insufficient funds</Text>}
         {hasAvailableBalance && usdValue && (
           <Text>${usdValue.toLocaleString()} USD</Text>
         )}
-        {usdValue && <Text css={{ color: '$gray10' }}>+ 5 SC fee</Text>}
+        {usdValue && <Text>+ 5 SC fee</Text>}
       </Flex>
     </Flex>
   )

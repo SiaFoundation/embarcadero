@@ -24,6 +24,6 @@ export function useHasBalance({ currency, isOffer, value }: Props) {
     }
     const sfBalance = new BigNumber(wallet?.siafundbalance || 0)
 
-    return sfBalance >= value
+    return sfBalance.gte(value)
   }, [isOffer, currency, value, wallet])
 }

@@ -12,15 +12,22 @@ export function Wallet() {
   }
 
   return (
-    <Panel>
-      <Flex gap="2" align="center" css={{ height: '$6', padding: '0 $2' }}>
+    <Panel
+      css={{
+        display: 'none',
+        '@bp1': {
+          display: 'block',
+        },
+      }}
+    >
+      <Flex align="center" css={{ height: '$5', padding: '0 $2' }}>
         <Text css={{ fontWeight: '600' }}>
           {(
             Number(wallet?.confirmedsiacoinbalance || 0) / Math.pow(10, 24)
           ).toLocaleString()}{' '}
           SC
         </Text>
-        <Separator orientation="vertical" />
+        <Separator orientation="vertical" pad="1-5" size="1" />
         <Text css={{ fontWeight: '600' }}>
           {Number(wallet?.siafundbalance || 0).toLocaleString()} SF
         </Text>

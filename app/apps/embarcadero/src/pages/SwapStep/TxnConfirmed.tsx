@@ -3,18 +3,13 @@ import { SwapOverview } from '../../components/SwapOverview'
 import { DownloadTransaction } from '../../components/DownloadTransaction'
 import { Message } from '../../components/Message'
 
-export function TransactionComplete() {
+export function TxnConfirmed() {
   return (
     <Flex direction="column" align="center" gap="3">
       <SwapOverview />
-      <Flex
-        direction="column"
-        align="center"
-        gap="3"
-        css={{ overflow: 'hidden', width: '100%' }}
-      >
+      <Flex direction="column" align="center" gap="1-5">
         <Message
-          icon={<CheckmarkOutline16 />}
+          variant="success"
           message={`
             The swap has been signed by both parties and is complete. Download the completed transaction.
           `}

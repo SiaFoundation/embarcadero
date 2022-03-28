@@ -7,10 +7,10 @@ export function DownloadTransaction() {
     <Button
       onClick={() => downloadTxn()}
       size="3"
-      variant="green"
+      variant="gray"
       css={{ width: '100%' }}
     >
-      Download transaction file
+      Download signed transaction
       <Box as="span" css={{ pl: '$1', lh: '1' }}>
         <DocumentDownload16 />
       </Box>

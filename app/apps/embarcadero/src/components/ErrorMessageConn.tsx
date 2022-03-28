@@ -10,7 +10,7 @@ export function ErrorMessageConn() {
     return null
   }
 
-  return <Message variant="red" message={connError} />
+  return <Message variant="error" message={connError} />
 }
 
 function getConnError(conn: Connectivity) {

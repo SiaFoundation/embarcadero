@@ -8,11 +8,12 @@ export const routes = {
 }
 
 export const swapStatusToRoute: Record<SwapStatus, keyof typeof routes> = {
-  creatingANewSwap: 'create',
-  loadingAnExistingSwap: 'input',
+  createANewSwap: 'create',
+  openASwap: 'input',
   waitingForYouToAccept: 'swap',
   waitingForCounterpartyToAccept: 'swap',
-  waitingForCounterpartyToFinish: 'swap',
   waitingForYouToFinish: 'swap',
-  transactionComplete: 'swap',
+  waitingForCounterpartyToFinish: 'swap',
+  swapTransactionPending: 'swap',
+  swapTransactionConfirmed: 'swap',
 }

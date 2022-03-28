@@ -4,7 +4,7 @@ import { Wallet } from './Wallet'
 
 export function User() {
   return (
-    <Flex gap="2" align="center">
+    <Flex gap="1" align="center">
       <Wallet />
       <UserMenu size="2" />
     </Flex>

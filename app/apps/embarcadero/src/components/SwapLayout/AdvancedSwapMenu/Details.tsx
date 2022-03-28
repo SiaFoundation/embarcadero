@@ -13,7 +13,7 @@ export function Details() {
     <Accordion type="single" css={{ width: '100%' }}>
       <AccordionItem value="swap">
         <AccordionTrigger>
-          <Text size="3" css={{ fontWeight: 500 }}>
+          <Text size="14" css={{ fontWeight: 500 }}>
             Swap
           </Text>
         </AccordionTrigger>
@@ -23,7 +23,7 @@ export function Details() {
       </AccordionItem>
       <AccordionItem value="transaction">
         <AccordionTrigger>
-          <Text size="3" css={{ fontWeight: 500 }}>
+          <Text size="14" css={{ fontWeight: 500 }}>
             Transaction
           </Text>
         </AccordionTrigger>

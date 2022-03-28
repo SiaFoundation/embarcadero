@@ -37,22 +37,21 @@ export function Footer() {
     <Panel
       css={{
         position: 'fixed',
-        bottom: '$3',
-        right: '$5',
-        padding: '$2 $3',
+        bottom: '$2',
+        right: '$3',
       }}
     >
-      <Flex gap="2" align="center">
+      <Flex align="center" css={{ padding: '$1-5' }}>
         {siad && (
           <Fragment>
             <Tooltip content="Current transaction fee">
-              <Text size="1" css={{ fontFamily: '$mono', lineHeight: '1' }}>
+              <Text size="12" css={{ fontFamily: '$mono', lineHeight: '1' }}>
                 {((Number(wallet?.dustthreshold) / Math.pow(10, 24)) * 1024) /
                   0.001}{' '}
                 mS / KB
               </Text>
             </Tooltip>
-            <Separator orientation="vertical" />
+            <Separator pad="1-5" size="1" orientation="vertical" />
             <Tooltip
               content={
                 settings.siaStats
@@ -60,11 +59,11 @@ export function Footer() {
                   : 'Block height'
               }
             >
-              <Text size="1" css={{ fontFamily: '$mono' }}>
+              <Text size="12" css={{ fontFamily: '$mono' }}>
                 {consensus?.height}
               </Text>
             </Tooltip>
-            <Separator orientation="vertical" />
+            <Separator pad="1-5" size="1" orientation="vertical" />
           </Fragment>
         )}
         <NetworkStatus

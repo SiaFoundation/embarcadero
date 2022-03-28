@@ -15,7 +15,7 @@ export function PrivacyDialog() {
 
   return (
     <Box>
-      <Flex direction="column" gap="4">
+      <Flex direction="column" gap="2">
         <DialogTitle>Privacy</DialogTitle>
         <Paragraph size="1">
           This app uses the following third-party APIs, all external APIs are
@@ -31,6 +31,7 @@ export function PrivacyDialog() {
                 SiaStats
               </Heading>
               <Switch
+                size="2"
                 checked={settings.siaStats}
                 onCheckedChange={(val) =>
                   setSettings((settings) => ({ ...settings, siaStats: val }))
