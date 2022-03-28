@@ -22,10 +22,9 @@ import { usePathParams } from '../hooks/usePathParams'
 import { downloadJsonFile } from '../lib/download'
 import { useHistory } from 'react-router-dom'
 import {
-  getSwapStatusRemote,
   SwapStatusLocal,
   SwapStatus,
-  SwapStageRemoteInt,
+  SwapStatusRemote,
 } from '../lib/swapStatus'
 import { swapTxnSchema } from '../lib/validate'
 import { api } from '../config'
@@ -45,7 +44,7 @@ type SwapSummary = {
   amountSC: string
   amountSF: string
   amountFee: string
-  stage: SwapStageRemoteInt
+  status: SwapStatusRemote
 }
 
 type SummarizeResponse = {
@@ -244,7 +243,7 @@ export function SwapProvider({ children }: Props) {
     localStatus = 'openASwap'
   }
 
-  const status = getSwapStatusRemote(summary?.stage) || localStatus
+  const status = summary?.status || localStatus
 
   const ref = useRef({
     txn,

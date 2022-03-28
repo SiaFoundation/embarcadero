@@ -20,15 +20,6 @@ var siad *client.Client
 
 var minerFee = types.SiacoinPrecision.Mul64(5)
 
-var statusToStage = map[string]int{
-	"waitingForYouToAccept":          1,
-	"waitingForCounterpartyToAccept": 2,
-	"waitingForYouToFinish":          3,
-	"waitingForCounterpartyToFinish": 4,
-	"swapTransactionPending":         5,
-	"swapTransactionConfirmed":       6,
-}
-
 // A SwapTransaction is a transaction that swaps Siacoin for Siafunds between
 // two parties.
 type SwapTransaction struct {
@@ -47,7 +38,7 @@ type SwapSummary struct {
 	AmountSF  types.Currency `json:"amountSF"`
 	AmountSC  types.Currency `json:"amountSC"`
 	MinerFee  types.Currency `json:"minerFee"`
-	Stage     int            `json:"stage"`
+	Status    string         `json:"status"`
 }
 
 // transaction converts the swap transaction into a full transaction.
@@ -417,67 +408,67 @@ func summarize(swap SwapTransaction) (s SwapSummary, err error) {
 	s.AmountSF = swap.SiafundOutputs[0].Value
 	s.MinerFee = minerFee
 
-	s.Stage = stage(swap)
+	s.Status = status(swap)
 
-	if s.Stage == 0 {
+	if s.Status == "" {
 		return SwapSummary{}, fmt.Errorf("failed to get swap status")
 	}
 
 	return
 }
 
-// acceptStage checks if the swap is ready to be accepted and which party needs to accept.
-func acceptStage(swap SwapTransaction) int {
+// acceptStatus checks if the swap is ready to be accepted and which party needs to accept.
+func acceptStatus(swap SwapTransaction) string {
 	if err := checkAccept(swap); err != nil {
-		return 0
+		return ""
 	}
 	wag, err := siad.WalletAddressesGet()
 	if err != nil {
-		return 0
+		return ""
 	}
 	for _, addr := range wag.Addresses {
 		if swap.SiacoinOutputs[0].UnlockHash == addr || swap.SiafundOutputs[0].UnlockHash == addr {
-			return statusToStage["waitingForCounterpartyToAccept"]
+			return "waitingForCounterpartyToAccept"
 		}
 	}
-	return statusToStage["waitingForYouToAccept"]
+	return "waitingForYouToAccept"
 }
 
-// finishStage checks if the swap is ready to be finished and which party needs to finish.
-func finishStage(swap SwapTransaction) int {
+// finishStatus checks if the swap is ready to be finished and which party needs to finish.
+func finishStatus(swap SwapTransaction) string {
 	err := checkFinish(swap, false)
 	if err == nil {
-		return statusToStage["waitingForYouToFinish"]
+		return "waitingForYouToFinish"
 	}
 	err = checkFinish(swap, true)
 	if err == nil {
-		return statusToStage["waitingForCounterpartyToFinish"]
+		return "waitingForCounterpartyToFinish"
 	}
-	return 0
+	return ""
 }
 
-// txnStage checks if the swap txn is in the txn pool and whether its confirmed.
-func txnStage(swap SwapTransaction) int {
+// txnStatus checks if the swap txn is in the txn pool and whether its confirmed.
+func txnStatus(swap SwapTransaction) string {
 	wtg, err := siad.WalletTransactionGet(swap.transaction().ID())
 	if err != nil {
-		return 0
+		return ""
 	}
 	if wtg.Transaction.ConfirmationHeight == math.MaxUint64 {
-		return statusToStage["swapTransactionPending"]
+		return "swapTransactionPending"
 	}
-	return statusToStage["swapTransactionConfirmed"]
+	return "swapTransactionConfirmed"
 }
 
-// stage gets the overall stage of a swap txn.
-func stage(swap SwapTransaction) int {
-	if status := txnStage(swap); status != 0 {
+// status gets the overall status of a swap txn.
+func status(swap SwapTransaction) string {
+	if status := txnStatus(swap); status != "" {
 		return status
 	}
-	if status := finishStage(swap); status != 0 {
+	if status := finishStatus(swap); status != "" {
 		return status
 	}
-	if status := acceptStage(swap); status != 0 {
+	if status := acceptStatus(swap); status != "" {
 		return status
 	}
-	return 0
+	return ""
 }

@@ -8,13 +8,13 @@ import (
 	"strings"
 )
 
-var stageToDescription = []string{
-	1: "Waiting for you to accept",
-	2: "Waiting for counterparty to accept",
-	3: "Waiting for you to finish",
-	4: "Waiting for counterparty to finish",
-	5: "Swap transaction pending",
-	6: "Swap transaction confirmed",
+var statusToDescription = map[string]string{
+	"waitingForYouToAccept":          "Waiting for you to accept",
+	"waitingForCounterpartyToAccept": "Waiting for counterparty to accept",
+	"waitingForYouToFinish":          "Waiting for you to finish",
+	"waitingForCounterpartyToFinish": "Waiting for counterparty to finish",
+	"swapTransactionPending":         "Swap transaction pending",
+	"swapTransactionConfirmed":       "Swap transaction confirmed",
 }
 
 func encodeSwapFile(s SwapTransaction) (string, error) {
@@ -40,13 +40,31 @@ func decodeSwapFile(filePath string) (swap SwapTransaction, err error) {
 	return
 }
 
-func waitingOnCounterpartyOrComplete(s SwapSummary) bool {
-	for _, stage := range []int{2, 4, 5, 6} {
-		if stage == s.Stage {
-			return true
-		}
+func noUserInteractionRequired(s SwapSummary) bool {
+	switch s.Status {
+	case "waitingForCounterpartyToAccept", "waitingForCounterpartyToFinish", "swapTransactionPending", "swapTransactionConfirmed":
+		return true
+	default:
+		return false
 	}
-	return false
+}
+
+func userStepsComplete(s SwapSummary) bool {
+	switch s.Status {
+	case "swapTransactionPending", "swapTransactionConfirmed":
+		return true
+	default:
+		return false
+	}
+}
+
+func acceptStepsComplete(s SwapSummary) bool {
+	switch s.Status {
+	case "waitingForYouToAccept", "waitingForCounterpartyToAccept":
+		return false
+	default:
+		return true
+	}
 }
 
 func printSummary(s SwapSummary) error {
@@ -57,7 +75,7 @@ func printSummary(s SwapSummary) error {
 	fmt.Println("Swap summary:")
 	fmt.Println("  You receive:           ", ours)
 	fmt.Println("  Counterparty receives: ", theirs)
-	fmt.Println("  Status:                ", stageToDescription[s.Stage])
+	fmt.Println("  Status:                ", statusToDescription[s.Status])
 	if s.ReceiveSF {
 		fmt.Println()
 		fmt.Println("  You will also pay the 5 SC transaction fee.")
@@ -78,11 +96,11 @@ func printTransaction(swap SwapTransaction) error {
 	fmt.Println("  ID:   ", swap.transaction().ID())
 	fmt.Println("  File: ", nextFilePath)
 	fmt.Println()
-	if s.Stage > 4 {
+	if userStepsComplete(s) {
 		return nil
 	}
 	command := "accept"
-	if s.Stage > 2 {
+	if acceptStepsComplete(s) {
 		command = "finish"
 	}
 	fmt.Println("To proceed, send your counterparty the transaction file and ask them to run the following command:")
@@ -120,7 +138,7 @@ func acceptCLI(filePath string) {
 		log.Fatal(err)
 	}
 	printSummary(sum)
-	if waitingOnCounterpartyOrComplete(sum) {
+	if noUserInteractionRequired(sum) {
 		return
 	}
 	if err := checkAccept(swap); err != nil {
@@ -154,7 +172,7 @@ func finishCLI(filePath string) {
 		log.Fatal(err)
 	}
 	printSummary(sum)
-	if waitingOnCounterpartyOrComplete(sum) {
+	if noUserInteractionRequired(sum) {
 		return
 	}
 	fmt.Println()
