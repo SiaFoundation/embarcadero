@@ -23,10 +23,6 @@ export function SwapStep() {
   const { isValidating, status } = useSwap()
   const { route: currentRoute } = usePathParams()
 
-  // if (isValidating) {
-  //   return null
-  // }
-
   if (!status) {
     return <Redirect to={routes.home} />
   }

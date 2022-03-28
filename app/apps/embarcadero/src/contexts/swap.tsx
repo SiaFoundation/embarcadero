@@ -102,7 +102,7 @@ export function SwapProvider({ children }: Props) {
       const func = async () => {
         try {
           setIsValidating(true)
-          const { data, error } = await fetchSummary(txn)
+          const { data } = await fetchSummary(txn)
 
           if (data) {
             const { id, summary } = data
@@ -110,7 +110,6 @@ export function SwapProvider({ children }: Props) {
             setId(id)
             setSummary(summary)
             setTxn(txn)
-            console.log(id, summary, txn)
             const nextRoute: keyof typeof routes = 'swap'
             if (currentRoute !== nextRoute) {
               history.push(routes.swap)
