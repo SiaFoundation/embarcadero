@@ -116,7 +116,7 @@ export function CreateNewSwap() {
           <Message
             variant="info"
             message={`
-            The party sending SF will receive a separate SC payout for with file contract dividends
+            The party sending SF will receive a separate SC payout for with file contract dividends.
           `}
           />
         )}
