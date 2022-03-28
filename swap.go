@@ -464,9 +464,8 @@ func txnStage(swap SwapTransaction) int {
 	}
 	if wtg.Transaction.ConfirmationHeight == math.MaxUint64 {
 		return statusToStage["swapTransactionPending"]
-	} else {
-		return statusToStage["swapTransactionConfirmed"]
 	}
+	return statusToStage["swapTransactionConfirmed"]
 }
 
 // stage gets the overall stage of a swap txn.
