@@ -44,8 +44,8 @@ func createHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 		writeError(w, "Invalid swap: must specify one SC value and one SF value", http.StatusBadRequest)
 		return
 	}
-	input, output := ParseCurrency(cr.Offer), ParseCurrency(cr.Receive)
-	swap, err := CreateSwap(input, output, strings.Contains(cr.Offer, "SF"))
+	input, output := parseCurrency(cr.Offer), parseCurrency(cr.Receive)
+	swap, err := createSwap(input, output, strings.Contains(cr.Offer, "SF"))
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
@@ -70,16 +70,16 @@ func acceptHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := CheckAccept(ar.Swap); err != nil {
+	if err := checkAccept(ar.Swap); err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := AcceptSwap(&ar.Swap); err != nil {
+	if err := acceptSwap(&ar.Swap); err != nil {
 		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, acceptResponse{
-		ID:   ar.Swap.Transaction().ID().String(),
+		ID:   ar.Swap.transaction().ID().String(),
 		Swap: ar.Swap,
 	})
 }
@@ -99,16 +99,16 @@ func finishHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Params) 
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := CheckFinish(fr.Swap); err != nil {
+	if err := checkFinish(fr.Swap, false); err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if err := FinishSwap(&fr.Swap); err != nil {
+	if err := finishSwap(&fr.Swap); err != nil {
 		writeError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	writeJSON(w, finishResponse{
-		ID:   fr.Swap.Transaction().ID().String(),
+		ID:   fr.Swap.transaction().ID().String(),
 		Swap: fr.Swap,
 	})
 }
@@ -128,13 +128,13 @@ func summarizeHandler(w http.ResponseWriter, r *http.Request, _ httprouter.Param
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	summary, err := Summarize(fr.Swap)
+	summary, err := summarize(fr.Swap)
 	if err != nil {
 		writeError(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 	writeJSON(w, summarizeResponse{
-		ID:      fr.Swap.Transaction().ID().String(),
+		ID:      fr.Swap.transaction().ID().String(),
 		Summary: summary,
 	})
 }
