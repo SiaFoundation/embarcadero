@@ -1,19 +1,36 @@
-import { Box, Button, DocumentDownload16 } from '@siafoundation/design-system'
+import {
+  Box,
+  Button,
+  ControlGroup,
+  Copy24,
+  copyToClipboard,
+  IconButton,
+  Tooltip,
+} from '@siafoundation/design-system'
 import { useSwap } from '../contexts/swap'
 
 export function DownloadTransaction() {
-  const { downloadTxn } = useSwap()
+  const { id, downloadTxn } = useSwap()
   return (
-    <Button
-      onClick={() => downloadTxn()}
-      size="3"
-      variant="green"
-      css={{ width: '100%' }}
-    >
-      Download transaction file
-      <Box as="span" css={{ pl: '$1', lh: '1' }}>
-        <DocumentDownload16 />
-      </Box>
-    </Button>
+    <ControlGroup css={{ width: '100%' }}>
+      <Button
+        onClick={() => downloadTxn()}
+        size="3"
+        variant="gray"
+        css={{ flex: 1 }}
+      >
+        Download signed transaction
+      </Button>
+      <Tooltip content="Copy transaction ID">
+        <IconButton
+          variant="gray"
+          size="3"
+          css={{ borderRadius: '$2' }}
+          onClick={() => id && copyToClipboard(id, 'transaction ID')}
+        >
+          <Copy24 />
+        </IconButton>
+      </Tooltip>
+    </ControlGroup>
   )
 }

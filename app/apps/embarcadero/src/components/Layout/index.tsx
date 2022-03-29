@@ -1,4 +1,4 @@
-import { Toaster, Background, ScrollArea } from '@siafoundation/design-system'
+import { Toaster, AppBackdrop, ScrollArea } from '@siafoundation/design-system'
 import React from 'react'
 import { Footer } from './Footer'
 import { Navbar } from './Navbar'
@@ -14,7 +14,7 @@ export function Layout({ children }: Props) {
     <ScrollArea>
       <Dialogs />
       <Toaster />
-      <Background level="1" />
+      <AppBackdrop />
       <Navbar />
       <SwapLayout>{children}</SwapLayout>
       <Footer />

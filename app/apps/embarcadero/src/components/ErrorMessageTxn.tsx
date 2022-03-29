@@ -8,5 +8,5 @@ export function ErrorMessageTxn() {
     return null
   }
 
-  return <Message variant="red" message={'Error completing transaction'} />
+  return <Message variant="error" message={txnError} />
 }

@@ -28,7 +28,7 @@ export function TransactionDetails() {
         {keys.map((key) => (
           <AccordionItem key={key} value={key}>
             <AccordionTrigger>
-              <Text size="3" css={{ fontWeight: 500 }}>
+              <Text size="14" css={{ fontWeight: 500 }}>
                 {key} ({txn[key]?.length || 0})
               </Text>
             </AccordionTrigger>

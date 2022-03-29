@@ -8,7 +8,7 @@ export function SwapDropzone() {
 
   return (
     <Flex direction="column" gap="3">
-      {fileReadError && <Message variant="red" message={fileReadError} />}
+      {fileReadError && <Message variant="error" message={fileReadError} />}
       <Dropzone
         title={
           <Fragment>

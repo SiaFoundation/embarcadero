@@ -5,26 +5,44 @@ import {
   Flex,
   Heading,
   Logo,
+  SimpleLogoIcon,
+  Text,
 } from '@siafoundation/design-system'
 import { User } from '../User'
 
 export function Navbar() {
   return (
-    <AppBar size="3" color="none" sticky>
-      <Container size="4" css={{ position: 'relative' }}>
-        <Flex align="center" gap="1">
-          <Box css={{ position: 'relative', top: '-2px' }}>
-            <Logo />
-          </Box>
-          <Heading
+    <AppBar size="2" color="none" sticky>
+      <Container size="4">
+        <Flex align="center" gap="2">
+          <Flex
+            align="center"
+            gap="1-5"
             css={{
-              color: '$primary12',
-              display: 'inline',
-              fontWeight: '600',
+              position: 'relative',
+              top: '-1px',
             }}
           >
-            Embarcadero
-          </Heading>
+            <Box
+              css={{
+                transform: 'scale(1.4)',
+              }}
+            >
+              <Logo />
+            </Box>
+            <Heading
+              size="1"
+              css={{
+                fontWeight: '600',
+                display: 'none',
+                '@bp1': {
+                  display: 'block',
+                },
+              }}
+            >
+              Embarcadero
+            </Heading>
+          </Flex>
           <Box css={{ flex: 1 }} />
           <User />
         </Flex>

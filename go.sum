@@ -126,6 +126,8 @@ gitlab.com/NebulousLabs/fastrand v0.0.0-20181126182046-603482d69e40/go.mod h1:rO
 gitlab.com/NebulousLabs/go-upnp v0.0.0-20181011194642-3a71999ed0d3/go.mod h1:sleOmkovWsDEQVYXmOJhx69qheoMTmCuPYyiCFCihlg=
 gitlab.com/NebulousLabs/go-upnp v0.0.0-20210414172302-67b91c9a5c03 h1:RJ5YhMTigGRkUb8bTA83iU1v8bbTn1uc+7q84saIH1U=
 gitlab.com/NebulousLabs/go-upnp v0.0.0-20210414172302-67b91c9a5c03/go.mod h1:vhrHTGDh4YR7wK8Z+kRJ+x8SF/6RUM3Vb64Si5FD0L8=
+gitlab.com/NebulousLabs/go-upnp v0.0.0-20211002182029-11da932010b6 h1:WKij6HF8ECp9E7K0E44dew9NrRDGiNR5u4EFsXnJUx4=
+gitlab.com/NebulousLabs/go-upnp v0.0.0-20211002182029-11da932010b6/go.mod h1:vhrHTGDh4YR7wK8Z+kRJ+x8SF/6RUM3Vb64Si5FD0L8=
 gitlab.com/NebulousLabs/log v0.0.0-20200529173103-40b250c2d92c/go.mod h1:qOhJbQ7Vzw+F+RCVmpPZ7WAwBIM9PZv4tWKp6Kgd9CY=
 gitlab.com/NebulousLabs/log v0.0.0-20200604091839-0ba4a941cdc2 h1:b6KJfBiIrGGSxcHVmLLyjJbwAmlIiA9M1qsMTsr8d1s=
 gitlab.com/NebulousLabs/log v0.0.0-20200604091839-0ba4a941cdc2/go.mod h1:qOhJbQ7Vzw+F+RCVmpPZ7WAwBIM9PZv4tWKp6Kgd9CY=
@@ -148,6 +150,8 @@ gitlab.com/NebulousLabs/writeaheadlog v0.0.0-20200618142844-c59a90f49130/go.mod 
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.sia.tech/siad v1.5.7 h1:yFVNyMrCSl6vE0XjlhitFYXxgpVf15ILuCSbp7ZfExM=
 go.sia.tech/siad v1.5.7/go.mod h1:/xtHgMhNKI+cpwm5kjl9u7EG4kqMiYpmucDG710GaRY=
+go.sia.tech/siad v1.5.8-0.20220326194532-4aab495f51cb h1:n5e2RtxRfRo1bFsNtQSewjGiolTjzsuSvGO36e8abJU=
+go.sia.tech/siad v1.5.8-0.20220326194532-4aab495f51cb/go.mod h1:0Jh3fJuyWzqboe3IWKp5hh2wYoL23Ik9Nex7b/zX0RU=
 go.uber.org/atomic v1.4.0/go.mod h1:gD2HeocX3+yG+ygLZcrzQJaqmWj9AIm7n08wl/qW/PE=
 go.uber.org/multierr v1.1.0/go.mod h1:wR5kodmAFQ0UK8QlbwjlSNy0Z68gJhDJUG5sjR94q/0=
 go.uber.org/zap v1.10.0/go.mod h1:vwi/ZaCAaUcBkycHslxD9B2zi4UTXhF60s6SWpuDF0Q=

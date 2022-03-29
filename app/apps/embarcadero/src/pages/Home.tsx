@@ -1,9 +1,20 @@
-import { Flex, Paragraph, RLink, Separator } from '@siafoundation/design-system'
+import {
+  Button,
+  ControlGroup,
+  Flex,
+  Paragraph,
+  RRLink,
+  RRLinkButton,
+  Separator,
+  Text,
+} from '@siafoundation/design-system'
 import { useEffect } from 'react'
+import { useHistory } from 'react-router-dom'
 import { useSwap } from '../contexts/swap'
 import { routes } from '../routes'
 
 export function Home() {
+  const history = useHistory()
   const { resetTxn } = useSwap()
   useEffect(() => {
     resetTxn()
@@ -11,18 +22,31 @@ export function Home() {
   }, [])
 
   return (
-    <Flex direction="column" gap="2">
-      <Flex direction="column" gap="4">
+    <Flex direction="column" gap="3">
+      <Flex direction="column" gap="2">
         <Paragraph>
           Welcome to Embarcadero, a tool for conducting escrowless SC/SF swaps.
         </Paragraph>
-        <Flex direction="column" gap="4" align="start" css={{ mb: '$2' }}>
-          <RLink to={routes.create}>Create a new swap transaction →</RLink>
-          <RLink to={routes.input}>Load an existing swap transaction →</RLink>
-        </Flex>
+        <ControlGroup>
+          <Button
+            size="2"
+            css={{ flex: 1 }}
+            onClick={() => history.push(routes.input)}
+          >
+            Open a swap →
+          </Button>
+          <Button
+            size="2"
+            variant="accent"
+            css={{ flex: 1 }}
+            onClick={() => history.push(routes.create)}
+          >
+            Create a new swap →
+          </Button>
+        </ControlGroup>
+        <Separator size="100" pad="0" />
       </Flex>
-      <Separator size="3" />
-      <Flex direction="column" gap="4">
+      <Flex direction="column" gap="2-5">
         <Paragraph size="1">
           Executing a swap is a three-part process. Here, we assume that the
           swappers, Alice and Bob, have established a communication channel and

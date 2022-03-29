@@ -1,4 +1,10 @@
-import { Button, Flex } from '@siafoundation/design-system'
+import {
+  Button,
+  Flex,
+  NextOutline16,
+  NextOutline32,
+  Number_132,
+} from '@siafoundation/design-system'
 import { SwapOverview } from '../../components/SwapOverview'
 import { useSwap } from '../../contexts/swap'
 import { Fragment } from 'react'
@@ -18,12 +24,7 @@ export function ReviewAccept() {
   return (
     <Flex direction="column" align="center" gap="3">
       <SwapOverview />
-      <Flex
-        direction="column"
-        align="center"
-        gap="3"
-        css={{ overflow: 'hidden', width: '100%' }}
-      >
+      <Flex direction="column" align="center" gap="1-5">
         <Fragment>
           <Message
             message={`
@@ -34,7 +35,7 @@ export function ReviewAccept() {
           <ErrorMessageConn />
           <Button
             size="3"
-            variant="green"
+            variant="accent"
             css={{ width: '100%' }}
             disabled={!readyToSign}
             onClick={() => signTxn('accept')}

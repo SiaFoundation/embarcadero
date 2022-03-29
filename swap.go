@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"math/big"
 	"reflect"
 	"strings"
@@ -18,6 +19,15 @@ import (
 var siad *client.Client
 
 var minerFee = types.SiacoinPrecision.Mul64(5)
+
+const (
+	waitingForYouToAccept          = "waitingForYouToAccept"
+	waitingForCounterpartyToAccept = "waitingForCounterpartyToAccept"
+	waitingForYouToFinish          = "waitingForYouToFinish"
+	waitingForCounterpartyToFinish = "waitingForCounterpartyToFinish"
+	swapTransactionPending         = "swapTransactionPending"
+	swapTransactionConfirmed       = "swapTransactionConfirmed"
+)
 
 // A SwapTransaction is a transaction that swaps Siacoin for Siafunds between
 // two parties.
@@ -37,11 +47,11 @@ type SwapSummary struct {
 	AmountSF  types.Currency `json:"amountSF"`
 	AmountSC  types.Currency `json:"amountSC"`
 	MinerFee  types.Currency `json:"minerFee"`
-	Stage     int            `json:"stage"`
+	Status    string         `json:"status"`
 }
 
-// Transaction converts the swap transaction into a full transaction.
-func (swap *SwapTransaction) Transaction() types.Transaction {
+// transaction converts the swap transaction into a full transaction.
+func (swap *SwapTransaction) transaction() types.Transaction {
 	return types.Transaction{
 		SiacoinInputs:         swap.SiacoinInputs,
 		SiafundInputs:         swap.SiafundInputs,
@@ -52,9 +62,9 @@ func (swap *SwapTransaction) Transaction() types.Transaction {
 	}
 }
 
-// ParseCurrency parses a suffixed Siacoin or Siafund string into a currency
+// parseCurrency parses a suffixed Siacoin or Siafund string into a currency
 // value.
-func ParseCurrency(amount string) types.Currency {
+func parseCurrency(amount string) types.Currency {
 	amount = strings.TrimSpace(amount)
 	if strings.HasSuffix(amount, "SF") || strings.HasSuffix(amount, "H") {
 		i, ok := new(big.Int).SetString(strings.TrimRight(amount, "SFH"), 10)
@@ -185,7 +195,7 @@ func signSC(swap *SwapTransaction) error {
 		})
 		toSign = append(toSign, crypto.Hash(sci.ParentID))
 	}
-	txn := swap.Transaction()
+	txn := swap.transaction()
 	wspr, err := siad.WalletSignPost(txn, toSign)
 	swap.Signatures = wspr.Transaction.TransactionSignatures
 	return err
@@ -201,15 +211,15 @@ func signSF(swap *SwapTransaction) error {
 		})
 		toSign = append(toSign, crypto.Hash(sfi.ParentID))
 	}
-	txn := swap.Transaction()
+	txn := swap.transaction()
 	wspr, err := siad.WalletSignPost(txn, toSign)
 	swap.Signatures = wspr.Transaction.TransactionSignatures
 	return err
 }
 
-// CreateSwap creates a new SwapTransaction swapping the input amount for the
+// createSwap creates a new SwapTransaction swapping the input amount for the
 // output amount.
-func CreateSwap(inputAmount, outputAmount types.Currency, offeringSF bool) (SwapTransaction, error) {
+func createSwap(inputAmount, outputAmount types.Currency, offeringSF bool) (SwapTransaction, error) {
 	wag, err := siad.WalletAddressGet()
 	if err != nil {
 		return SwapTransaction{}, err
@@ -244,8 +254,8 @@ func CreateSwap(inputAmount, outputAmount types.Currency, offeringSF bool) (Swap
 	return swap, nil
 }
 
-// CheckAccept checks that the counterparty's swap transaction is valid
-func CheckAccept(swap SwapTransaction) error {
+// checkAccept checks that the counterparty's swap transaction is valid.
+func checkAccept(swap SwapTransaction) error {
 	if len(swap.SiacoinInputs) == 0 && len(swap.SiafundInputs) == 0 {
 		return errors.New("transaction has no inputs")
 	} else if len(swap.SiacoinInputs) > 0 && len(swap.SiafundInputs) > 0 {
@@ -260,8 +270,8 @@ func CheckAccept(swap SwapTransaction) error {
 	return nil
 }
 
-// AcceptSwap accepts and signs a swap transaction.
-func AcceptSwap(swap *SwapTransaction) error {
+// acceptSwap accepts and signs a swap transaction.
+func acceptSwap(swap *SwapTransaction) error {
 	wag, err := siad.WalletAddressGet()
 	if err != nil {
 		return fmt.Errorf("failed to get wallet address: %w", err)
@@ -279,8 +289,8 @@ func AcceptSwap(swap *SwapTransaction) error {
 	return signSF(swap)
 }
 
-// CheckFinish checks that the accepted swap transaction is valid
-func CheckFinish(swap SwapTransaction) error {
+// checkFinish checks that the accepted swap transaction is valid.
+func checkFinish(swap SwapTransaction, theirs bool) error {
 	if len(swap.SiacoinInputs) == 0 || len(swap.SiafundInputs) == 0 {
 		return errors.New("transaction is missing inputs")
 	} else if len(swap.SiacoinOutputs) == 0 || len(swap.SiafundOutputs) == 0 {
@@ -307,7 +317,7 @@ func CheckFinish(swap SwapTransaction) error {
 			break
 		}
 	}
-	if haveSCSignature {
+	if !theirs && haveSCSignature || theirs && !haveSCSignature {
 		// all of the SF inputs should belong to us
 		for _, sfi := range swap.SiafundInputs {
 			if !belongsToUs[sfi.UnlockConditions.UnlockHash()] {
@@ -357,8 +367,8 @@ func CheckFinish(swap SwapTransaction) error {
 	return nil
 }
 
-// FinishSwap signs and broadcasts an accepted swap transaction.
-func FinishSwap(swap *SwapTransaction) error {
+// finishSwap signs and broadcasts an accepted swap transaction.
+func finishSwap(swap *SwapTransaction) error {
 	var haveSCSignatures bool
 	for _, sci := range swap.SiacoinInputs {
 		if crypto.Hash(sci.ParentID) == swap.Signatures[0].ParentID {
@@ -375,12 +385,13 @@ func FinishSwap(swap *SwapTransaction) error {
 	if err != nil {
 		return fmt.Errorf("failed to sign swap transaction: %w", err)
 	}
-	return siad.TransactionPoolRawPost(swap.Transaction(), nil)
+	return siad.TransactionPoolRawPost(swap.transaction(), nil)
 }
 
-// Summarize returns a summary of the swap.
-func Summarize(swap SwapTransaction) (s SwapSummary, err error) {
+// summarize returns a summary of the swap.
+func summarize(swap SwapTransaction) (s SwapSummary, err error) {
 	wag, err := siad.WalletAddressesGet()
+
 	if err != nil {
 		return SwapSummary{}, fmt.Errorf("failed to get wallet addresses: %w", err)
 	}
@@ -392,23 +403,81 @@ func Summarize(swap SwapTransaction) (s SwapSummary, err error) {
 			break
 		}
 	}
+
+	if !s.ReceiveSC && !s.ReceiveSF {
+		if swap.SiacoinOutputs[0].UnlockHash == (types.UnlockHash{}) {
+			s.ReceiveSC = true
+		}
+		if swap.SiafundOutputs[0].UnlockHash == (types.UnlockHash{}) {
+			s.ReceiveSF = true
+		}
+	}
+
 	s.AmountSC = swap.SiacoinOutputs[0].Value
 	s.AmountSF = swap.SiafundOutputs[0].Value
 	s.MinerFee = minerFee
-	s.Stage = 0
-	if s.ReceiveSC || s.ReceiveSF {
-		s.Stage++
-		if len(swap.Signatures) > 0 {
-			s.Stage++
-			receiveSCHasSigned := swap.Signatures[0].ParentID == crypto.Hash(swap.SiacoinInputs[0].ParentID)
-			receiveSFHasSigned := swap.Signatures[0].ParentID == crypto.Hash(swap.SiafundInputs[0].ParentID)
-			if s.ReceiveSC && receiveSCHasSigned {
-				s.Stage++
-			}
-			if s.ReceiveSF && receiveSFHasSigned {
-				s.Stage++
-			}
+
+	s.Status = status(swap)
+
+	if s.Status == "" {
+		return SwapSummary{}, fmt.Errorf("failed to get swap status")
+	}
+
+	return
+}
+
+// acceptStatus checks if the swap is ready to be accepted and which party needs to accept.
+func acceptStatus(swap SwapTransaction) string {
+	if err := checkAccept(swap); err != nil {
+		return ""
+	}
+	wag, err := siad.WalletAddressesGet()
+	if err != nil {
+		return ""
+	}
+	for _, addr := range wag.Addresses {
+		if swap.SiacoinOutputs[0].UnlockHash == addr || swap.SiafundOutputs[0].UnlockHash == addr {
+			return waitingForCounterpartyToAccept
 		}
 	}
-	return
+	return waitingForYouToAccept
+}
+
+// finishStatus checks if the swap is ready to be finished and which party needs to finish.
+func finishStatus(swap SwapTransaction) string {
+	err := checkFinish(swap, false)
+	if err == nil {
+		return waitingForYouToFinish
+	}
+	err = checkFinish(swap, true)
+	if err == nil {
+		return waitingForCounterpartyToFinish
+	}
+	return ""
+}
+
+// txnStatus checks if the swap txn is in the txn pool and whether its confirmed.
+func txnStatus(swap SwapTransaction) string {
+	wtg, err := siad.WalletTransactionGet(swap.transaction().ID())
+	if err != nil {
+		return ""
+	}
+	if wtg.Transaction.ConfirmationHeight == math.MaxUint64 {
+		return swapTransactionPending
+	}
+	return swapTransactionConfirmed
+}
+
+// status gets the overall status of a swap txn.
+func status(swap SwapTransaction) string {
+	if status := txnStatus(swap); status != "" {
+		return status
+	}
+	if status := finishStatus(swap); status != "" {
+		return status
+	}
+	if status := acceptStatus(swap); status != "" {
+		return status
+	}
+	return ""
 }

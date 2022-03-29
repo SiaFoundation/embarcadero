@@ -12,21 +12,22 @@ export function SwapLayout({ children }: Props) {
     <Container
       size="1"
       css={{
-        padding: '20px 0',
+        py: '20px',
       }}
     >
       <Panel
-        size="3"
         css={{
           backgroundColor: '$loContrast',
+          borderRadius: '$3',
+          width: '100%',
         }}
       >
         <Flex
           direction="column"
-          gap="4"
+          gap="2"
           justify="center"
           css={{
-            padding: '$3',
+            padding: '$1-5 $2 $2 $2',
           }}
         >
           <SwapNav />

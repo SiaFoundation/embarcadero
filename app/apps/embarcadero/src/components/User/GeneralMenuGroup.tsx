@@ -17,54 +17,30 @@ export function GeneralMenuGroup() {
   return (
     <DropdownMenuGroup>
       <DropdownMenuLabel>General</DropdownMenuLabel>
-      <DropdownMenuItem>
-        <Link
-          href="https://github.com/SiaFoundation/embarcadero"
-          target="_blank"
-          css={{
-            display: 'flex',
-            width: '100%',
-            alignItems: 'center',
-          }}
-        >
+      <Link href="https://github.com/SiaFoundation/embarcadero" target="_blank">
+        <DropdownMenuItem>
           About
           <DropdownMenuRightSlot>
             <Information16 />
           </DropdownMenuRightSlot>
-        </Link>
-      </DropdownMenuItem>
-      <DropdownMenuItem>
-        <Link
-          href="https://discord.gg/sia"
-          target="_blank"
-          css={{
-            display: 'flex',
-            width: '100%',
-            alignItems: 'center',
-          }}
-        >
+        </DropdownMenuItem>
+      </Link>
+      <Link href="https://discord.gg/sia" target="_blank">
+        <DropdownMenuItem>
           Discord
           <DropdownMenuRightSlot>
             <LogoDiscord16 />
           </DropdownMenuRightSlot>
-        </Link>
-      </DropdownMenuItem>
-      <DropdownMenuItem>
-        <Link
-          href="https://support.sia.tech"
-          target="_blank"
-          css={{
-            display: 'flex',
-            width: '100%',
-            alignItems: 'center',
-          }}
-        >
+        </DropdownMenuItem>
+      </Link>
+      <Link href="https://support.sia.tech" target="_blank">
+        <DropdownMenuItem>
           Docs
           <DropdownMenuRightSlot>
             <Notebook16 />
           </DropdownMenuRightSlot>
-        </Link>
-      </DropdownMenuItem>
+        </DropdownMenuItem>
+      </Link>
       <DropdownMenuItem onSelect={() => openDialog('privacy')}>
         Privacy
         <DropdownMenuRightSlot>
