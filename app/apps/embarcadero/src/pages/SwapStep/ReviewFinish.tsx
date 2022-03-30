@@ -7,7 +7,7 @@ import { useTxnHasBalance } from '../../hooks/useTxnHasBalance'
 import { useConnectivity } from '../../hooks/useConnectivity'
 import { ErrorMessageConn } from '../../components/ErrorMessageConn'
 import { ErrorMessageTxn } from '../../components/ErrorMessageTxn'
-import { DownloadTransaction } from '../../components/DownloadTransaction'
+import { DownloadTxn } from '../../components/DownloadTxn'
 
 export function ReviewFinish() {
   const { signTxn } = useSwap()
@@ -21,7 +21,7 @@ export function ReviewFinish() {
       <SwapOverview />
       <Flex direction="column" align="center" gap="1-5">
         <Fragment>
-          <DownloadTransaction />
+          <DownloadTxn />
           <Message
             message={`
                 Sign and broadcast the transaction to complete the swap.

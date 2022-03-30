@@ -1,6 +1,6 @@
 import { Flex, CheckmarkOutline16 } from '@siafoundation/design-system'
 import { SwapOverview } from '../../components/SwapOverview'
-import { DownloadTransaction } from '../../components/DownloadTransaction'
+import { DownloadTxn } from '../../components/DownloadTxn'
 import { Message } from '../../components/Message'
 
 export function TxnConfirmed() {
@@ -14,7 +14,7 @@ export function TxnConfirmed() {
             The swap has been signed by both parties and is complete. Download the completed transaction.
           `}
         />
-        <DownloadTransaction />
+        <DownloadTxn />
       </Flex>
     </Flex>
   )
