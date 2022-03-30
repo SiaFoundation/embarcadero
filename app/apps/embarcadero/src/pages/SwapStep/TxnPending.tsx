@@ -1,6 +1,6 @@
 import { Flex } from '@siafoundation/design-system'
 import { SwapOverview } from '../../components/SwapOverview'
-import { DownloadTransaction } from '../../components/DownloadTransaction'
+import { DownloadTxn } from '../../components/DownloadTxn'
 import { Message } from '../../components/Message'
 
 export function TxnPending() {
@@ -8,7 +8,7 @@ export function TxnPending() {
     <Flex direction="column" align="center" gap="3">
       <SwapOverview />
       <Flex direction="column" align="center" gap="1-5">
-        <DownloadTransaction />
+        <DownloadTxn />
         <Message
           variant="info"
           message={`

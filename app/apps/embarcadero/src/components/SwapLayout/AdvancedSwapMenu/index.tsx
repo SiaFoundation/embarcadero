@@ -7,6 +7,7 @@ import {
   PopoverTrigger,
   Settings24,
 } from '@siafoundation/design-system'
+import { CopyTxnId } from '../../CopyTxnId'
 import { Details } from './Details'
 
 export function AdvancedSwapMenu() {
@@ -19,7 +20,10 @@ export function AdvancedSwapMenu() {
       </PopoverTrigger>
       <PopoverContent align="end" css={{ padding: '$2', minWidth: '400px' }}>
         <Flex direction="column" gap="2">
-          <Heading>Advanced</Heading>
+          <Flex align="center" justify="between">
+            <Heading>Advanced</Heading>
+            <CopyTxnId />
+          </Flex>
           <Details />
         </Flex>
       </PopoverContent>

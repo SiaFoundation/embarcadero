@@ -1,6 +1,6 @@
 import { Flex } from '@siafoundation/design-system'
 import { SwapOverview } from '../../components/SwapOverview'
-import { DownloadTransaction } from '../../components/DownloadTransaction'
+import { DownloadTxn } from '../../components/DownloadTxn'
 import { Message } from '../../components/Message'
 import { ErrorMessageTxn } from '../../components/ErrorMessageTxn'
 
@@ -16,7 +16,7 @@ export function WaitingFinish() {
             with your counterparty. Your counterparty can then sign and broadcast the completed transaction.
           `}
         />
-        <DownloadTransaction />
+        <DownloadTxn />
         <Message
           message={`
             Once the counterparty finalizes the swap transaction, Embarcadero will be able to confirm it on the network.

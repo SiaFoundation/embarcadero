@@ -7,7 +7,7 @@ import {
 import { SwapOverview } from '../../components/SwapOverview'
 import { Message } from '../../components/Message'
 import { SwapDropzone } from '../../components/SwapDropzone'
-import { DownloadTransaction } from '../../components/DownloadTransaction'
+import { DownloadTxn } from '../../components/DownloadTxn'
 
 export function WaitingAccept() {
   return (
@@ -20,7 +20,7 @@ export function WaitingAccept() {
             with your counterparty for signing.
           `}
         />
-        <DownloadTransaction />
+        <DownloadTxn />
         <Message
           message={`
             Retrieve the signed transaction file from your counterparty and open it to continue.
