@@ -68,6 +68,7 @@ type State = {
   signTxn: (step: 'accept' | 'finish') => void
   fileReadError?: string
   txnError?: string
+  hasDownloaded: boolean
 }
 
 const SwapContext = createContext({} as State)
@@ -208,12 +209,6 @@ export function SwapProvider({ children }: Props) {
     [txn, setTxnError, loadTxn]
   )
 
-  const downloadTxn = useCallback(() => {
-    if (id && txn) {
-      downloadJsonFile(`embc_txn_${id.slice(0, 6)}`, txn)
-    }
-  }, [id, txn])
-
   const { sc, sf, offerSc } = useMemo(() => {
     if (!summary) {
       return {
@@ -244,6 +239,20 @@ export function SwapProvider({ children }: Props) {
   }
 
   const status = summary?.status || localStatus
+
+  const [hasDownloaded, setHasDownloaded] = useState<boolean>(false)
+
+  useEffect(() => {
+    setHasDownloaded(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status])
+
+  const downloadTxn = useCallback(() => {
+    if (id && txn) {
+      downloadJsonFile(`embc_txn_${id.slice(0, 6)}`, txn)
+      setHasDownloaded(true)
+    }
+  }, [id, txn, setHasDownloaded])
 
   const ref = useRef({
     txn,
@@ -291,6 +300,7 @@ export function SwapProvider({ children }: Props) {
     signTxn,
     fileReadError,
     txnError,
+    hasDownloaded,
   }
 
   return <SwapContext.Provider value={value}>{children}</SwapContext.Provider>
