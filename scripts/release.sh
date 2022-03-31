@@ -20,7 +20,11 @@ for OS in linux windows darwin; do
 		echo "Building $RELEASE $OS/$ARCH"
 		rm -rf dist
 		mkdir -p dist/embarcadero
-		GOOS=$OS GOARCH=$ARCH go build -trimpath -ldflags='-s -w' -o dist/embarcadero/embc .
+		BIN=embc
+		if [ $OS = "windows" ]; then
+			BIN=embc.exe
+		fi
+		GOOS=$OS GOARCH=$ARCH go build -trimpath -ldflags='-s -w' -o dist/embarcadero/$bin .
 		cp README.md dist/embarcadero/
 		ZIP_OUTPUT="release/embarcadero_${RELEASE}_${OS}_${ARCH}.zip"
 		if [ "$OS" = "darwin" ]; then
