@@ -2,7 +2,7 @@
 
 ---
 
-`embarcadero` is a tool for conducting escrowless SF<->SC swaps.
+Embarcadero is a tool for conducting escrowless SF<->SC swaps.
 
 Executing a swap is a three-part process. Here, we assume that the swappers,
 Alice and Bob, have established a communication channel and have negotiated the
@@ -18,13 +18,7 @@ terms of the swap (in this case, 7SF for 10MS).
    all is well, she adds her signatures. The transaction is now complete, so
    Alice broadcasts it to the Sia network for inclusion in the next block.
 
-`embarcadero` facilitates these three steps with either a UI or CLI.
-
-The UI can be opened by running:
-
-- `embc`
-
-The CLI offers the following three commands:
+To launch the swap creation interface, just run `embc` from your terminal. If you prefer to use a CLI, that's supported as well:
 
 - `embc create` creates the initial transaction with Alice's inputs
 - `embc accept` adds Bob's inputs and signatures

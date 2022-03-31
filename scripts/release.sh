@@ -20,16 +20,15 @@ for OS in linux windows darwin; do
 		echo "Building $RELEASE $OS/$ARCH"
 		rm -rf dist
 		mkdir -p dist/embarcadero
-		GOOS=$OS GOARCH=$ARCH go build -trimpath -ldflags='-s -w' -o dist/embarcadero/ .
+		GOOS=$OS GOARCH=$ARCH go build -trimpath -ldflags='-s -w' -o dist/embarcadero/embc .
 		cp README.md dist/embarcadero/
 		ZIP_OUTPUT="release/embarcadero_${RELEASE}_${OS}_${ARCH}.zip"
 		if [ "$OS" = "darwin" ]; then
-			codesign --deep -f -v --timestamp -o runtime,library -s $APPLE_CERT_ID dist/embarcadero/embarcadero
+			codesign --deep -f -v --timestamp -o runtime,library -s $APPLE_CERT_ID dist/embarcadero/embc
 			ditto -ck dist/embarcadero $ZIP_OUTPUT
 			xcrun notarytool submit -k ~/private_keys/AuthKey_$APPLE_API_KEY.p8 -d $APPLE_API_KEY -i $APPLE_API_ISSUER --wait --timeout 10m $ZIP_OUTPUT
 		else
 			zip -qj $ZIP_OUTPUT dist/embarcadero/*
 		fi
-		# TODO: sign releases with GitHub key
 	done
 done
